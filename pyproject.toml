@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "retrieval-evaluation-framework"
+version = "0.1.0"
+description = "Production-quality framework for retrieval pipeline evaluation and optimization."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "Rohan Sahu" }
+]
+dependencies = [
+  "loguru>=0.7.2,<1.0.0",
+  "pydantic>=2.8.2,<3.0.0",
+  "pypdf>=5.0.0,<6.0.0",
+  "python-docx>=1.1.2,<2.0.0",
+  "pyyaml>=6.0.2,<7.0.0",
+  "rich>=13.7.1,<14.0.0",
+  "typer>=0.12.3,<1.0.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.11.1,<2.0.0",
+  "pytest>=8.3.2,<9.0.0",
+  "ruff>=0.5.7,<1.0.0",
+  "types-PyYAML>=6.0.12.20240311,<7.0.0"
+]
+retrieval = [
+  "faiss-cpu>=1.8.0.post1,<2.0.0",
+  "rank-bm25>=0.2.2,<1.0.0",
+  "sentence-transformers>=3.0.1,<4.0.0",
+  "transformers>=4.43.3,<5.0.0"
+]
+
+[project.scripts]
+retrieval = "retrieval_evaluation_framework.cli.app:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retrieval_evaluation_framework"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "C4"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["docx", "docx.*", "pypdf", "pypdf.*"]
+ignore_missing_imports = true

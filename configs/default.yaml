@@ -1,0 +1,28 @@
+device: auto
+logging:
+  level: INFO
+ingestion:
+  input_directory: data/input
+  recursive: true
+  supported_extensions:
+    - .pdf
+    - .docx
+    - .txt
+    - .md
+preprocessing:
+  normalize_unicode: true
+  cleanup_whitespace: true
+  remove_headers: true
+  remove_footers: true
+  remove_page_numbers: true
+  remove_empty_lines: true
+chunking:
+  strategy: recursive
+  chunk_size: 120
+  overlap: 20
+  semantic_similarity_threshold: 0.58
+  semantic_min_sentences: 2
+  semantic_encoder_model:
+output:
+  output_directory: data/processed
+  processed_corpus_filename: processed_corpus.json
