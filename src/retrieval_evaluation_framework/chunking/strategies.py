@@ -122,7 +122,7 @@ class SemanticChunker(BaseChunker):
         self._model: Any | None = None
         if config.semantic_encoder_model:
             try:
-                from sentence_transformers import (  # type: ignore[import-not-found]
+                from sentence_transformers import (
                     SentenceTransformer,
                 )
 

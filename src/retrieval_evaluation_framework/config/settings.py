@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import platform
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Literal
 
@@ -29,11 +31,36 @@ def resolve_device(device: DeviceName) -> ResolvedDeviceName:
     if importlib.util.find_spec("torch") is None:
         return "cpu"
 
-    import torch  # type: ignore[import-not-found]
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json, torch; "
+                "print(json.dumps({"
+                "'cuda': bool(torch.cuda.is_available()), "
+                "'mps': bool("
+                "getattr(torch.backends, 'mps', None) and torch.backends.mps.is_available()"
+                ")"
+                "}))"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    if probe.returncode != 0:
+        return "cpu"
 
-    if torch.cuda.is_available():
+    try:
+        payload = yaml.safe_load(probe.stdout) or {}
+    except Exception:
+        payload = {}
+
+    if payload.get("cuda") is True:
         return "cuda"
-    if platform.system() == "Darwin" and torch.backends.mps.is_available():
+    if platform.system() == "Darwin" and payload.get("mps") is True:
         return "mps"
     return "cpu"
 
@@ -101,6 +128,148 @@ class OutputConfig(BaseModel):
     processed_corpus_filename: str = "processed_corpus.json"
 
 
+EmbeddingBackendName = Literal["auto", "sentence_transformers", "hashing"]
+
+
+class EmbeddingConfig(BaseModel):
+    """Embedding generation configuration."""
+
+    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    backend: EmbeddingBackendName = "auto"
+    device: DeviceName = "auto"
+    batch_size: int = 32
+    normalize_embeddings: bool = True
+    fallback_dimension: int = 384
+    cache_directory: Path = Path("data/cache/embeddings")
+    show_progress: bool = True
+
+    @model_validator(mode="after")
+    def validate_batch_size(self) -> EmbeddingConfig:
+        """Validate the configured batch size.
+
+        Returns:
+            The validated model instance.
+        """
+        if self.batch_size <= 0:
+            msg = "batch_size must be greater than zero"
+            raise ValueError(msg)
+        if self.fallback_dimension <= 0:
+            msg = "fallback_dimension must be greater than zero"
+            raise ValueError(msg)
+        return self
+
+
+class BM25IndexConfig(BaseModel):
+    """BM25 index configuration."""
+
+    k1: float = 1.5
+    b: float = 0.75
+
+
+class DenseIndexConfig(BaseModel):
+    """Dense (FAISS) index configuration."""
+
+    metric: Literal["cosine"] = "cosine"
+
+
+class IndexConfig(BaseModel):
+    """Index construction and persistence configuration."""
+
+    index_directory: Path = Path("data/index")
+    bm25: BM25IndexConfig = Field(default_factory=BM25IndexConfig)
+    dense: DenseIndexConfig = Field(default_factory=DenseIndexConfig)
+
+
+class FusionConfig(BaseModel):
+    """Hybrid retrieval fusion configuration."""
+
+    strategy: Literal["reciprocal_rank_fusion"] = "reciprocal_rank_fusion"
+    rrf_k: int = 60
+
+
+class RetrievalConfig(BaseModel):
+    """Retriever selection and behavior configuration."""
+
+    retriever: Literal["bm25", "dense", "hybrid"] = "hybrid"
+    top_k: int = 10
+    fusion: FusionConfig = Field(default_factory=FusionConfig)
+
+    @model_validator(mode="after")
+    def validate_top_k(self) -> RetrievalConfig:
+        """Validate the configured Top-K value.
+
+        Returns:
+            The validated model instance.
+        """
+        if self.top_k <= 0:
+            msg = "top_k must be greater than zero"
+            raise ValueError(msg)
+        return self
+
+
+QueryEnhancementMethod = Literal["none", "expansion", "hyde"]
+HydeBackendName = Literal["auto", "transformers", "template"]
+
+
+class QueryExpansionConfig(BaseModel):
+    """Query expansion configuration."""
+
+    max_expansion_terms: int = 3
+    similarity_threshold: float = 0.35
+    vocabulary_size: int = 512
+
+
+class HydeConfig(BaseModel):
+    """HyDE (Hypothetical Document Embeddings) configuration."""
+
+    backend: HydeBackendName = "auto"
+    generator_model: str = "gpt2"
+    max_new_tokens: int = 48
+
+
+class QueryEnhancementConfig(BaseModel):
+    """Optional query enhancement configuration."""
+
+    enabled: bool = False
+    method: QueryEnhancementMethod = "none"
+    expansion: QueryExpansionConfig = Field(default_factory=QueryExpansionConfig)
+    hyde: HydeConfig = Field(default_factory=HydeConfig)
+
+
+RerankerBackendName = Literal["auto", "cross_encoder", "lexical"]
+
+
+class RerankingConfig(BaseModel):
+    """Optional reranking configuration."""
+
+    enabled: bool = False
+    backend: RerankerBackendName = "auto"
+    model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    top_n: int = 5
+
+
+class BenchmarkConfig(BaseModel):
+    """Benchmarking and experiment tracking configuration."""
+
+    dataset_path: Path | None = None
+    experiment_directory: Path = Path("reports/experiments")
+    results_directory: Path = Path("reports/benchmarks")
+    test_split_ratio: float = 0.2
+    notes: str | None = None
+
+    @model_validator(mode="after")
+    def validate_ratio(self) -> BenchmarkConfig:
+        """Validate optional train/test split configuration.
+
+        Returns:
+            The validated benchmark configuration.
+        """
+        if not 0 < self.test_split_ratio < 1:
+            msg = "test_split_ratio must be between 0 and 1"
+            raise ValueError(msg)
+        return self
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -110,6 +279,12 @@ class AppConfig(BaseModel):
     preprocessing: PreprocessingConfig = Field(default_factory=PreprocessingConfig)
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    index: IndexConfig = Field(default_factory=IndexConfig)
+    retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
+    query_enhancement: QueryEnhancementConfig = Field(default_factory=QueryEnhancementConfig)
+    reranking: RerankingConfig = Field(default_factory=RerankingConfig)
+    benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
 
     @classmethod
     def load_yaml(cls, path: Path) -> AppConfig:

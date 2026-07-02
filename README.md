@@ -1,30 +1,25 @@
 # Retrieval Evaluation & Optimization Framework
 
-This repository contains the phase-1 foundation for a production-grade retrieval evaluation framework. The current implementation covers document ingestion, configurable preprocessing, multiple chunking strategies, a reusable processing pipeline, and a basic CLI for preparing corpora for later retrieval experiments.
+This repository contains a production-oriented retrieval engineering toolkit for designing and validating retrieval pipelines before they are attached to a RAG application. The current implementation spans corpus preparation, embedding generation, index persistence, multi-strategy retrieval, optional query enhancement, optional reranking, a CLI, and a basic FastAPI surface.
 
 ## Features
 
-- YAML-driven configuration with automatic device resolution.
+- YAML-driven configuration with automatic CPU, CUDA, and Apple MPS selection.
 - Modular ingestion for PDF, DOCX, TXT, and Markdown.
-- Configurable preprocessing for normalization and cleanup.
-- Fixed, recursive, and semantic chunking strategies.
-- Processed corpus serialization for later retrieval and benchmarking phases.
-- Typer CLI with Rich progress output.
-- Unit tests, Ruff configuration, and MyPy configuration.
+- Configurable preprocessing plus fixed, recursive, and semantic chunking.
+- Embedding engine with batching, caching, disk persistence, and interchangeable backends.
+- Supported embedding models:
+	- `sentence-transformers/all-MiniLM-L6-v2`
+	- `BAAI/bge-small-en-v1.5`
+- Optional query enhancement with query expansion and HyDE.
+- Optional cross-encoder reranking.
+- Typer CLI and FastAPI endpoints for embedding, indexing, and search.
 
 ## Installation
 
-```bash
-python3.12 -m venv venv
-source venv/bin/activate
-pip install -e .[dev]
 ```
 
-Optional retrieval dependencies for later phases:
-
-```bash
-pip install -e .[dev,retrieval]
-```
+Some embedding, HyDE, and reranking configurations download Hugging Face model weights on first use.
 
 ## Project Layout
 
@@ -38,32 +33,71 @@ src/retrieval_evaluation_framework/
 tests/
 ```
 
-## Phase 1 Usage
+## Retrieval Workflow
 
-Run chunk generation end to end for a file or directory:
+1. Ingest and preprocess source documents.
+2. Chunk documents into a processed corpus artifact.
+3. Generate embeddings for dense retrieval workflows.
+4. Build and persist BM25, FAISS, or hybrid indexes.
+5. Optionally enhance incoming queries.
+6. Retrieve candidate chunks.
+7. Optionally rerank results with a cross encoder.
+
+## CLI Usage
+
+Prepare a processed corpus:
 
 ```bash
 retrieval chunk ./data/input --config ./configs/default.yaml
 ```
 
-Run only ingestion:
+Persist embeddings for a processed corpus:
 
 ```bash
-retrieval ingest ./data/input --config ./configs/default.yaml
+retrieval retrieval embed \
+	--corpus-path ./data/processed/processed_corpus.json \
+	--config ./configs/default.yaml \
+	--output-path ./data/embeddings
 ```
 
-Run ingestion plus preprocessing:
+Build an index:
 
 ```bash
-retrieval preprocess ./data/input --config ./configs/default.yaml
+retrieval retrieval index \
+	--corpus-path ./data/processed/processed_corpus.json \
+	--config ./configs/default.yaml \
+	--index-path ./data/index
 ```
 
-The processed corpus is written to the configured output directory as JSON. Later phases can consume the same corpus without repeating ingestion and cleanup work.
+Run retrieval:
+
+```bash
+retrieval retrieval retrieve \
+	--query "What is the maternity leave policy?" \
+	--config ./configs/default.yaml \
+	--index-path ./data/index \
+	--top-k 5
+```
+
+`retrieval retrieval search` is an alias for the same retrieval path.
+
+## FastAPI Usage
+uvicorn retrieval_evaluation_framework.api.app:app --reload
+```
+- `POST /embed`
+Swagger UI is available at `/docs`, and the OpenAPI schema is available at `/openapi.json`.
+- BM25 remains a first-class retriever because lexical matching is still strong on policy, keyword, and exact-term workloads.
+- Hybrid retrieval combines BM25 and dense search because the two failure modes are complementary.
+- Reciprocal Rank Fusion is the default fusion strategy because it is simple, robust, and model-agnostic.
+- HyDE is supported because it often improves recall when user questions are short or underspecified.
+- Cross-encoder reranking is optional because it typically improves precision at the cost of latency.
+- MiniLM is a strong default for fast, low-cost dense retrieval.
+- BGE and E5 are included because they are common retrieval baselines with different trade-offs in quality, size, and instruction behavior.
 
 ## Quality Checks
 
 ```bash
-pytest
 ruff check .
 mypy
+pytest
 ```

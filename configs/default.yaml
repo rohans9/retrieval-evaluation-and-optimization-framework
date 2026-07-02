@@ -26,3 +26,47 @@ chunking:
 output:
   output_directory: data/processed
   processed_corpus_filename: processed_corpus.json
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  backend: auto
+  device: auto
+  batch_size: 32
+  normalize_embeddings: true
+  fallback_dimension: 384
+  cache_directory: data/cache/embeddings
+  show_progress: true
+index:
+  index_directory: data/index
+  bm25:
+    k1: 1.5
+    b: 0.75
+  dense:
+    metric: cosine
+retrieval:
+  retriever: hybrid
+  top_k: 10
+  fusion:
+    strategy: reciprocal_rank_fusion
+    rrf_k: 60
+query_enhancement:
+  enabled: false
+  method: none
+  expansion:
+    max_expansion_terms: 3
+    similarity_threshold: 0.35
+    vocabulary_size: 512
+  hyde:
+    backend: auto
+    generator_model: gpt2
+    max_new_tokens: 48
+reranking:
+  enabled: false
+  backend: auto
+  model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_n: 5
+benchmark:
+  dataset_path:
+  experiment_directory: reports/experiments
+  results_directory: reports/benchmarks
+  test_split_ratio: 0.2
+  notes:

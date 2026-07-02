@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import re
 from abc import ABC, abstractmethod
 
 from retrieval_evaluation_framework.config.settings import ChunkingConfig
 from retrieval_evaluation_framework.models import Chunk, Document
+from retrieval_evaluation_framework.utils.tokenization import TOKEN_PATTERN, count_tokens
 
-TOKEN_PATTERN = re.compile(r"\w+|[^\w\s]", re.UNICODE)
-
-
-def count_tokens(text: str) -> int:
-    """Count tokens using a lightweight regex tokenizer."""
-    return len(TOKEN_PATTERN.findall(text))
+__all__ = ["TOKEN_PATTERN", "BaseChunker", "ChunkerFactory", "count_tokens", "tail_tokens"]
 
 
 def tail_tokens(text: str, limit: int) -> str:

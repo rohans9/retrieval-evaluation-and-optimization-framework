@@ -63,3 +63,36 @@ class ProcessedCorpus(BaseModel):
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(self.model_dump_json(indent=2), encoding="utf-8")
         return destination
+
+
+class RetrievalResult(BaseModel):
+    """A single scored chunk returned by a retriever."""
+
+    chunk: Chunk
+    score: float
+    rank: int
+    retriever: str
+
+
+class QueryEnhancementResult(BaseModel):
+    """Outcome of applying an optional query enhancement technique."""
+
+    original_query: str
+    enhanced_query: str
+    method: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RetrievalResponse(BaseModel):
+    """Full response returned by the retrieval pipeline for a single query."""
+
+    query: str
+    enhanced_query: str | None = None
+    query_enhancement_method: str | None = None
+    retriever: str
+    reranked: bool
+    results: list[RetrievalResult]
+    retrieval_latency_ms: float
+    enhancement_latency_ms: float = 0.0
+    reranking_latency_ms: float = 0.0
+    total_latency_ms: float = 0.0
