@@ -150,3 +150,36 @@ def test_phase4_benchmarking_endpoints(tmp_path: Path) -> None:
     assert "artifacts" in reports_response.json()
     assert "html_paths" in visualizations_response.json()
     assert len(history_response.json()) == 1
+
+
+def test_leaderboard_validation_error_is_actionable(tmp_path: Path) -> None:
+    _PIPELINE_CACHE.clear()
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    experiment_directory = tmp_path / "experiments"
+
+    evaluate_response = CLIENT.post(
+        "/evaluate",
+        json={
+            "config_path": str(config_path),
+            "corpus_path": str(corpus_path),
+            "dataset_path": str(dataset_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+    assert evaluate_response.status_code == 200
+
+    invalid_response = CLIENT.get(
+        "/leaderboard",
+        params={
+            "config_path": str(config_path),
+            "experiment_directory": str(experiment_directory),
+            "sort_by": "invalid_metric",
+        },
+    )
+
+    assert invalid_response.status_code == 400
+    payload = invalid_response.json()
+    assert "detail" in payload
+    assert "suggestion" in payload

@@ -1,0 +1,12 @@
+device: cpu
+embedding:
+  model_name: local-hash
+  backend: hashing
+retrieval:
+  retriever: bm25
+  top_k: 5
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: false

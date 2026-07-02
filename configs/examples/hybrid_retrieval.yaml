@@ -1,0 +1,15 @@
+device: auto
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  backend: sentence_transformers
+retrieval:
+  retriever: hybrid
+  top_k: 8
+  fusion:
+    strategy: reciprocal_rank_fusion
+    rrf_k: 60
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: false

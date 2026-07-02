@@ -1,0 +1,37 @@
+device: cpu
+logging:
+  level: INFO
+ingestion:
+  recursive: true
+preprocessing:
+  normalize_unicode: true
+  cleanup_whitespace: true
+chunking:
+  strategy: recursive
+  chunk_size: 256
+  overlap: 32
+embedding:
+  model_name: local-hash
+  backend: hashing
+  device: cpu
+  batch_size: 16
+retrieval:
+  retriever: bm25
+  top_k: 5
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: false
+benchmark:
+  experiment_directory: reports/experiments
+  results_directory: reports/benchmarks
+reporting:
+  reports_directory: reports/generated
+visualization:
+  output_directory: reports/visualizations
+recommendation:
+  quality_weight: 0.65
+  latency_weight: 0.2
+  embedding_cost_weight: 0.075
+  index_build_weight: 0.075

@@ -1,0 +1,38 @@
+device: auto
+logging:
+  level: INFO
+ingestion:
+  recursive: true
+preprocessing:
+  normalize_unicode: true
+  cleanup_whitespace: true
+chunking:
+  strategy: semantic
+  chunk_size: 768
+  overlap: 96
+  semantic_similarity_threshold: 0.58
+  semantic_min_sentences: 2
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  backend: sentence_transformers
+  batch_size: 64
+retrieval:
+  retriever: hybrid
+  top_k: 10
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: false
+benchmark:
+  experiment_directory: reports/experiments
+  results_directory: reports/benchmarks
+reporting:
+  reports_directory: reports/generated
+visualization:
+  output_directory: reports/visualizations
+recommendation:
+  quality_weight: 0.65
+  latency_weight: 0.2
+  embedding_cost_weight: 0.075
+  index_build_weight: 0.075

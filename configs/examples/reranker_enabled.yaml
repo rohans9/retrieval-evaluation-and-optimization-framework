@@ -1,0 +1,14 @@
+device: auto
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  backend: sentence_transformers
+retrieval:
+  retriever: hybrid
+  top_k: 10
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: true
+  backend: lexical
+  top_n: 5

@@ -36,6 +36,9 @@ def _write_config(tmp_path: Path, index_path: Path) -> Path:
                 "  method: none",
                 "reranking:",
                 "  enabled: false",
+                "output:",
+                f"  output_directory: {tmp_path.as_posix()}",
+                "  processed_corpus_filename: processed_corpus.json",
             ]
         ),
         encoding="utf-8",
@@ -91,6 +94,14 @@ def test_openapi_schema_is_available() -> None:
 
     assert response.status_code == 200
     assert response.json()["info"]["title"] == "Retrieval Evaluation & Optimization Framework"
+
+    docs_response = CLIENT.get("/docs")
+    redoc_response = CLIENT.get("/redoc")
+    health_response = CLIENT.get("/health")
+    assert docs_response.status_code == 200
+    assert redoc_response.status_code == 200
+    assert health_response.status_code == 200
+    assert health_response.json()["status"] == "ok"
 
 
 def test_embed_endpoint_persists_embeddings(tmp_path: Path) -> None:
@@ -166,3 +177,57 @@ def test_index_and_retrieve_endpoints_work(tmp_path: Path) -> None:
     search_body = search_response.json()
     assert search_body["retriever"] == "bm25"
     assert len(search_body["results"]) == 1
+
+
+def test_ingest_preprocess_and_chunk_endpoints(tmp_path: Path, fixture_directory: Path) -> None:
+    _PIPELINE_CACHE.clear()
+    index_path = tmp_path / "index"
+    config_path = _write_config(tmp_path, index_path)
+
+    ingest_response = CLIENT.post(
+        "/ingest",
+        json={
+            "config_path": str(config_path),
+            "source_path": str(fixture_directory),
+        },
+    )
+    preprocess_response = CLIENT.post(
+        "/preprocess",
+        json={
+            "config_path": str(config_path),
+            "source_path": str(fixture_directory),
+        },
+    )
+    chunk_response = CLIENT.post(
+        "/chunk",
+        json={
+            "config_path": str(config_path),
+            "source_path": str(fixture_directory),
+        },
+    )
+
+    assert ingest_response.status_code == 200
+    assert preprocess_response.status_code == 200
+    assert chunk_response.status_code == 200
+    assert ingest_response.json()["stage"] == "ingest"
+    assert preprocess_response.json()["stage"] == "preprocess"
+    assert chunk_response.json()["stage"] == "chunk"
+    assert Path(chunk_response.json()["output_path"]).exists()
+
+
+def test_request_validation_error_is_actionable(tmp_path: Path) -> None:
+    index_path = tmp_path / "index"
+    config_path = _write_config(tmp_path, index_path)
+
+    response = CLIENT.post(
+        "/retrieve",
+        json={
+            "config_path": str(config_path),
+            "index_path": str(index_path),
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert "detail" in payload
+    assert "suggestion" in payload

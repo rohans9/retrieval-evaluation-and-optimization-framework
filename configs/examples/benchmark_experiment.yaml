@@ -1,0 +1,34 @@
+device: cpu
+logging:
+  level: INFO
+chunking:
+  strategy: recursive
+  chunk_size: 256
+  overlap: 32
+embedding:
+  model_name: local-hash
+  backend: hashing
+  device: cpu
+retrieval:
+  retriever: hybrid
+  top_k: 5
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: false
+benchmark:
+  dataset_path: examples/sample_data/evaluation_dataset.yaml
+  experiment_directory: reports/experiments
+  results_directory: reports/benchmarks
+  test_split_ratio: 0.2
+  notes: sample benchmark run
+reporting:
+  reports_directory: reports/generated
+visualization:
+  output_directory: reports/visualizations
+recommendation:
+  quality_weight: 0.65
+  latency_weight: 0.2
+  embedding_cost_weight: 0.075
+  index_build_weight: 0.075

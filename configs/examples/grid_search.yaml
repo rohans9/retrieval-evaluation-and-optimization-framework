@@ -1,0 +1,10 @@
+retrieval.top_k:
+  - 3
+  - 5
+retrieval.retriever:
+  - bm25
+  - dense
+  - hybrid
+reranking.enabled:
+  - false
+  - true

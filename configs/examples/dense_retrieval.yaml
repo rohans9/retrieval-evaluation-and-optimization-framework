@@ -1,0 +1,13 @@
+device: auto
+embedding:
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  backend: sentence_transformers
+  batch_size: 32
+retrieval:
+  retriever: dense
+  top_k: 8
+query_enhancement:
+  enabled: false
+  method: none
+reranking:
+  enabled: false

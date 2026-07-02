@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 import yaml
 from rich.console import Console
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 
 from retrieval_evaluation_framework.benchmarking.analysis import BenchmarkAnalysisService
@@ -16,7 +19,7 @@ from retrieval_evaluation_framework.benchmarking.comparison import ExperimentCom
 from retrieval_evaluation_framework.benchmarking.runner import BenchmarkRunner
 from retrieval_evaluation_framework.benchmarking.tracking import ExperimentTracker
 from retrieval_evaluation_framework.config.settings import AppConfig
-from retrieval_evaluation_framework.logging import configure_logging
+from retrieval_evaluation_framework.logging import configure_logging, get_logger
 from retrieval_evaluation_framework.pipeline import DocumentProcessingPipeline
 from retrieval_evaluation_framework.recommendation.leaderboard import parse_sort_metric
 from retrieval_evaluation_framework.retrieval.pipeline import RetrievalPipeline
@@ -25,6 +28,7 @@ app = typer.Typer(help="Retrieval Evaluation & Optimization Framework CLI")
 retrieval_app = typer.Typer(help="Retrieval engine commands")
 app.add_typer(retrieval_app, name="retrieval")
 console = Console()
+LOGGER = get_logger(component="cli")
 DEFAULT_CONFIG_PATH = Path("configs/default.yaml")
 DEFAULT_INDEX_PATH = Path("data/index")
 DEFAULT_EMBEDDINGS_PATH = Path("data/embeddings")
@@ -46,6 +50,45 @@ SourcePath = Annotated[Path, SOURCE_PATH_ARGUMENT]
 ConfigPath = Annotated[Path, CONFIG_PATH_OPTION]
 CorpusPath = Annotated[Path, CORPUS_PATH_OPTION]
 DatasetPath = Annotated[Path, DATASET_PATH_OPTION]
+def _run_with_progress[T](description: str, action: Callable[[], T]) -> T:
+    """Execute an action while rendering a Rich progress bar."""
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task(description, total=1)
+        result = action()
+        progress.advance(task)
+    return result
+
+
+@contextmanager
+def _command_span(command_name: str) -> Iterator[None]:
+    """Log command start/end and render user-friendly errors."""
+    start = time.perf_counter()
+    LOGGER.info("command_started", command=command_name)
+    try:
+        yield
+    except FileNotFoundError as error:
+        LOGGER.error("command_failed", command=command_name, reason=str(error))
+        console.print(f"[red]Error:[/red] {error}")
+        console.print("[yellow]Suggestion:[/yellow] Verify the input path and retry.")
+        raise typer.Exit(code=1) from error
+    except (RuntimeError, ValueError, typer.BadParameter) as error:
+        LOGGER.error("command_failed", command=command_name, reason=str(error))
+        console.print(f"[red]Error:[/red] {error}")
+        console.print("[yellow]Suggestion:[/yellow] Run with --help and check argument values.")
+        raise typer.Exit(code=1) from error
+    finally:
+        duration_ms = (time.perf_counter() - start) * 1000
+        LOGGER.info(
+            "command_completed",
+            command=command_name,
+            duration_ms=round(duration_ms, 2),
+        )
 
 
 def _load_pipeline(config_path: Path) -> DocumentProcessingPipeline:
@@ -145,13 +188,15 @@ def _run_evaluation_command(
     notes: str | None,
 ) -> None:
     config, runner, _ = _load_benchmark_runner(config_path, experiment_directory)
-    with console.status("Running evaluation benchmark..."):
-        result = runner.run_single_experiment(
+    result = _run_with_progress(
+        "Running evaluation benchmark",
+        lambda: runner.run_single_experiment(
             config=config,
             corpus_path=corpus_path,
             dataset_path=dataset_path,
             notes=notes or config.benchmark.notes,
-        )
+        ),
+    )
     _render_benchmark_result("Evaluation Summary", result)
 
 
@@ -160,19 +205,28 @@ def ingest(
     source_path: SourcePath,
     config_path: ConfigPath = DEFAULT_CONFIG_PATH,
 ) -> None:
-    """Ingest supported documents and persist the raw corpus."""
-    pipeline = _load_pipeline(config_path)
-    with console.status("Ingesting documents..."):
-        documents = pipeline.ingest_path(source_path)
-        output_path = pipeline.save_documents(
-            documents,
-            pipeline.config.output.output_directory / "ingested_documents.json",
-        )
+    """Ingest supported documents and persist the raw corpus.
 
-    _render_summary(
-        "Ingestion Summary",
-        [("Documents", str(len(documents))), ("Output", str(output_path))],
-    )
+    Example:
+        retrieval ingest ./data/input --config ./configs/default.yaml
+    """
+    with _command_span("ingest"):
+        pipeline = _load_pipeline(config_path)
+
+        def action() -> tuple[list[Any], Path]:
+            documents = pipeline.ingest_path(source_path)
+            output_path = pipeline.save_documents(
+                documents,
+                pipeline.config.output.output_directory / "ingested_documents.json",
+            )
+            return documents, output_path
+
+        documents, output_path = _run_with_progress("Ingesting documents", action)
+
+        _render_summary(
+            "Ingestion Summary",
+            [("Documents", str(len(documents))), ("Output", str(output_path))],
+        )
 
 
 @app.command()
@@ -180,19 +234,28 @@ def preprocess(
     source_path: SourcePath,
     config_path: ConfigPath = DEFAULT_CONFIG_PATH,
 ) -> None:
-    """Ingest and preprocess documents."""
-    pipeline = _load_pipeline(config_path)
-    with console.status("Preprocessing documents..."):
-        documents = pipeline.preprocess_documents(pipeline.ingest_path(source_path))
-        output_path = pipeline.save_documents(
-            documents,
-            pipeline.config.output.output_directory / "preprocessed_documents.json",
-        )
+    """Ingest and preprocess documents.
 
-    _render_summary(
-        "Preprocessing Summary",
-        [("Documents", str(len(documents))), ("Output", str(output_path))],
-    )
+    Example:
+        retrieval preprocess ./data/input --config ./configs/default.yaml
+    """
+    with _command_span("preprocess"):
+        pipeline = _load_pipeline(config_path)
+
+        def action() -> tuple[list[Any], Path]:
+            documents = pipeline.preprocess_documents(pipeline.ingest_path(source_path))
+            output_path = pipeline.save_documents(
+                documents,
+                pipeline.config.output.output_directory / "preprocessed_documents.json",
+            )
+            return documents, output_path
+
+        documents, output_path = _run_with_progress("Preprocessing documents", action)
+
+        _render_summary(
+            "Preprocessing Summary",
+            [("Documents", str(len(documents))), ("Output", str(output_path))],
+        )
 
 
 @app.command()
@@ -200,26 +263,35 @@ def chunk(
     source_path: SourcePath,
     config_path: ConfigPath = DEFAULT_CONFIG_PATH,
 ) -> None:
-    """Run the complete phase-1 pipeline and persist a processed corpus."""
-    pipeline = _load_pipeline(config_path)
-    with console.status("Generating chunks..."):
-        if source_path.is_file():
-            corpus = pipeline.process_file(source_path)
-        else:
-            corpus = pipeline.process_directory(source_path)
-        output_path = (
-            pipeline.config.output.output_directory
-            / pipeline.config.output.processed_corpus_filename
-        )
+    """Run phase-1 processing and persist a processed corpus.
 
-    _render_summary(
-        "Chunking Summary",
-        [
-            ("Documents", str(corpus.statistics["document_count"])),
-            ("Chunks", str(corpus.statistics["chunk_count"])),
-            ("Output", str(output_path)),
-        ],
-    )
+    Example:
+        retrieval chunk ./data/input --config ./configs/default.yaml
+    """
+    with _command_span("chunk"):
+        pipeline = _load_pipeline(config_path)
+
+        def action() -> Any:
+            if source_path.is_file():
+                corpus = pipeline.process_file(source_path)
+            else:
+                corpus = pipeline.process_directory(source_path)
+            output_path = (
+                pipeline.config.output.output_directory
+                / pipeline.config.output.processed_corpus_filename
+            )
+            return corpus, output_path
+
+        corpus, output_path = _run_with_progress("Generating chunks", action)
+
+        _render_summary(
+            "Chunking Summary",
+            [
+                ("Documents", str(corpus.statistics["document_count"])),
+                ("Chunks", str(corpus.statistics["chunk_count"])),
+                ("Output", str(output_path)),
+            ],
+        )
 
 
 @retrieval_app.command("embed")
@@ -228,28 +300,37 @@ def retrieval_embed(
     config_path: ConfigPath = DEFAULT_CONFIG_PATH,
     output_path: Annotated[Path, EMBEDDINGS_PATH_OPTION] = DEFAULT_EMBEDDINGS_PATH,
 ) -> None:
-    """Embed a processed corpus and persist the embeddings to disk."""
-    config = AppConfig.load_yaml(config_path)
-    configure_logging(config.logging.level)
+    """Embed a processed corpus and persist the embeddings to disk.
 
-    from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
-    from retrieval_evaluation_framework.models import ProcessedCorpus
+    Example:
+        retrieval retrieval embed --corpus-path ./data/processed/processed_corpus.json
+    """
+    with _command_span("retrieval.embed"):
+        config = AppConfig.load_yaml(config_path)
+        configure_logging(config.logging.level)
 
-    corpus = ProcessedCorpus.model_validate_json(corpus_path.read_text(encoding="utf-8"))
-    embedding_engine = EmbeddingEngine(config.embedding)
-    with console.status("Embedding chunks..."):
-        embedding_store = embedding_engine.embed_chunks(corpus.chunks)
-        embedding_store.save(output_path)
+        from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
+        from retrieval_evaluation_framework.models import ProcessedCorpus
 
-    _render_summary(
-        "Embedding Summary",
-        [
-            ("Chunks", str(len(embedding_store.chunk_ids))),
-            ("Model", embedding_store.model_name),
-            ("Dimension", str(embedding_store.dimension)),
-            ("Output", str(output_path)),
-        ],
-    )
+        corpus = ProcessedCorpus.model_validate_json(corpus_path.read_text(encoding="utf-8"))
+        embedding_engine = EmbeddingEngine(config.embedding)
+
+        def action() -> Any:
+            embedding_store = embedding_engine.embed_chunks(corpus.chunks)
+            embedding_store.save(output_path)
+            return embedding_store
+
+        embedding_store = _run_with_progress("Embedding chunks", action)
+
+        _render_summary(
+            "Embedding Summary",
+            [
+                ("Chunks", str(len(embedding_store.chunk_ids))),
+                ("Model", embedding_store.model_name),
+                ("Dimension", str(embedding_store.dimension)),
+                ("Output", str(output_path)),
+            ],
+        )
 
 
 @retrieval_app.command("index")
@@ -258,20 +339,29 @@ def retrieval_index(
     config_path: ConfigPath = DEFAULT_CONFIG_PATH,
     index_path: Annotated[Path, INDEX_PATH_OPTION] = DEFAULT_INDEX_PATH,
 ) -> None:
-    """Build and persist the configured retriever's index from a processed corpus."""
-    pipeline = _load_retrieval_pipeline(config_path)
-    with console.status("Building index..."):
-        corpus = pipeline.index_processed_corpus(corpus_path)
-        pipeline.save_index(index_path)
+    """Build and persist the configured retriever's index.
 
-    _render_summary(
-        "Indexing Summary",
-        [
-            ("Retriever", pipeline.retriever.name),
-            ("Chunks", str(len(corpus.chunks))),
-            ("Index Path", str(index_path)),
-        ],
-    )
+    Example:
+        retrieval retrieval index --corpus-path ./data/processed/processed_corpus.json
+    """
+    with _command_span("retrieval.index"):
+        pipeline = _load_retrieval_pipeline(config_path)
+
+        def action() -> Any:
+            corpus = pipeline.index_processed_corpus(corpus_path)
+            pipeline.save_index(index_path)
+            return corpus
+
+        corpus = _run_with_progress("Building index", action)
+
+        _render_summary(
+            "Indexing Summary",
+            [
+                ("Retriever", pipeline.retriever.name),
+                ("Chunks", str(len(corpus.chunks))),
+                ("Index Path", str(index_path)),
+            ],
+        )
 
 
 def _run_retrieve(
@@ -281,8 +371,7 @@ def _run_retrieve(
     top_k: int | None,
 ) -> None:
     pipeline = _load_retrieval_pipeline(config_path)
-    with console.status("Loading index..."):
-        pipeline.load_index(index_path)
+    _run_with_progress("Loading index", lambda: pipeline.load_index(index_path))
 
     start = time.perf_counter()
     response = pipeline.retrieve(query, top_k=top_k)
@@ -320,8 +409,13 @@ def retrieval_retrieve(
     index_path: Annotated[Path, INDEX_PATH_OPTION] = DEFAULT_INDEX_PATH,
     top_k: Annotated[int | None, TOP_K_OPTION] = None,
 ) -> None:
-    """Retrieve the most relevant chunks for a single query."""
-    _run_retrieve(config_path, index_path, query, top_k)
+    """Retrieve the most relevant chunks for a query.
+
+    Example:
+        retrieval retrieval retrieve --query "What is the policy?" --index-path ./data/index
+    """
+    with _command_span("retrieval.retrieve"):
+        _run_retrieve(config_path, index_path, query, top_k)
 
 
 @retrieval_app.command("search")
@@ -331,8 +425,13 @@ def retrieval_search(
     index_path: Annotated[Path, INDEX_PATH_OPTION] = DEFAULT_INDEX_PATH,
     top_k: Annotated[int | None, TOP_K_OPTION] = None,
 ) -> None:
-    """Alias for `retrieval retrieve`, provided for discoverability."""
-    _run_retrieve(config_path, index_path, query, top_k)
+    """Alias for retrieval retrieve.
+
+    Example:
+        retrieval retrieval search --query "hybrid schedules" --index-path ./data/index
+    """
+    with _command_span("retrieval.search"):
+        _run_retrieve(config_path, index_path, query, top_k)
 
 
 @retrieval_app.command("evaluate")
@@ -344,13 +443,14 @@ def retrieval_evaluate(
     notes: Annotated[str | None, NOTES_OPTION] = None,
 ) -> None:
     """Evaluate one retrieval pipeline against a labeled dataset."""
-    _run_evaluation_command(
-        corpus_path=corpus_path,
-        dataset_path=dataset_path,
-        config_path=config_path,
-        experiment_directory=experiment_directory,
-        notes=notes,
-    )
+    with _command_span("retrieval.evaluate"):
+        _run_evaluation_command(
+            corpus_path=corpus_path,
+            dataset_path=dataset_path,
+            config_path=config_path,
+            experiment_directory=experiment_directory,
+            notes=notes,
+        )
 
 
 @retrieval_app.command("benchmark")
@@ -362,13 +462,14 @@ def retrieval_benchmark(
     notes: Annotated[str | None, NOTES_OPTION] = None,
 ) -> None:
     """Alias for single-experiment evaluation benchmarking."""
-    _run_evaluation_command(
-        corpus_path=corpus_path,
-        dataset_path=dataset_path,
-        config_path=config_path,
-        experiment_directory=experiment_directory,
-        notes=notes,
-    )
+    with _command_span("retrieval.benchmark"):
+        _run_evaluation_command(
+            corpus_path=corpus_path,
+            dataset_path=dataset_path,
+            config_path=config_path,
+            experiment_directory=experiment_directory,
+            notes=notes,
+        )
 
 
 @retrieval_app.command("sweep")
@@ -381,29 +482,32 @@ def retrieval_sweep(
     notes: Annotated[str | None, NOTES_OPTION] = None,
 ) -> None:
     """Run a parameter sweep from a YAML or JSON parameter mapping."""
-    config, runner, _ = _load_benchmark_runner(config_path, experiment_directory)
-    sweep_parameters = _load_parameter_mapping(parameters_path)
-    with console.status("Running parameter sweep..."):
-        results = runner.parameter_sweep(
-            config=config,
-            corpus_path=corpus_path,
-            dataset_path=dataset_path,
-            sweep_parameters=sweep_parameters,
-            notes=notes or config.benchmark.notes,
+    with _command_span("retrieval.sweep"):
+        config, runner, _ = _load_benchmark_runner(config_path, experiment_directory)
+        sweep_parameters = _load_parameter_mapping(parameters_path)
+        results = _run_with_progress(
+            "Running parameter sweep",
+            lambda: runner.parameter_sweep(
+                config=config,
+                corpus_path=corpus_path,
+                dataset_path=dataset_path,
+                sweep_parameters=sweep_parameters,
+                notes=notes or config.benchmark.notes,
+            ),
         )
-    if any(result.experiment.retrieval_quality_metrics is None for result in results):
-        raise RuntimeError("Parameter sweep did not produce retrieval quality metrics")
-    sweep_metrics = [
-        result.experiment.retrieval_quality_metrics for result in results
-    ]
-    best_mrr = max(
-        metric.mean_reciprocal_rank for metric in sweep_metrics if metric is not None
-    )
+        if any(result.experiment.retrieval_quality_metrics is None for result in results):
+            raise RuntimeError("Parameter sweep did not produce retrieval quality metrics")
+        sweep_metrics = [
+            result.experiment.retrieval_quality_metrics for result in results
+        ]
+        best_mrr = max(
+            metric.mean_reciprocal_rank for metric in sweep_metrics if metric is not None
+        )
 
-    _render_summary(
-        "Sweep Summary",
-        [("Experiments", str(len(results))), ("Best MRR", f"{best_mrr:.4f}")],
-    )
+        _render_summary(
+            "Sweep Summary",
+            [("Experiments", str(len(results))), ("Best MRR", f"{best_mrr:.4f}")],
+        )
 
 
 @retrieval_app.command("grid-search")
@@ -416,29 +520,32 @@ def retrieval_grid_search(
     notes: Annotated[str | None, NOTES_OPTION] = None,
 ) -> None:
     """Run a full grid search from a YAML or JSON parameter mapping."""
-    config, runner, _ = _load_benchmark_runner(config_path, experiment_directory)
-    parameter_grid = _load_parameter_mapping(parameters_path)
-    with console.status("Running grid search..."):
-        results = runner.grid_search(
-            config=config,
-            corpus_path=corpus_path,
-            dataset_path=dataset_path,
-            parameter_grid=parameter_grid,
-            notes=notes or config.benchmark.notes,
+    with _command_span("retrieval.grid_search"):
+        config, runner, _ = _load_benchmark_runner(config_path, experiment_directory)
+        parameter_grid = _load_parameter_mapping(parameters_path)
+        results = _run_with_progress(
+            "Running grid search",
+            lambda: runner.grid_search(
+                config=config,
+                corpus_path=corpus_path,
+                dataset_path=dataset_path,
+                parameter_grid=parameter_grid,
+                notes=notes or config.benchmark.notes,
+            ),
         )
-    if any(result.experiment.retrieval_quality_metrics is None for result in results):
-        raise RuntimeError("Grid search did not produce retrieval quality metrics")
-    grid_metrics = [
-        result.experiment.retrieval_quality_metrics for result in results
-    ]
-    best_ndcg = max(
-        metric.ndcg_at_k for metric in grid_metrics if metric is not None
-    )
+        if any(result.experiment.retrieval_quality_metrics is None for result in results):
+            raise RuntimeError("Grid search did not produce retrieval quality metrics")
+        grid_metrics = [
+            result.experiment.retrieval_quality_metrics for result in results
+        ]
+        best_ndcg = max(
+            metric.ndcg_at_k for metric in grid_metrics if metric is not None
+        )
 
-    _render_summary(
-        "Grid Search Summary",
-        [("Experiments", str(len(results))), ("Best NDCG@K", f"{best_ndcg:.4f}")],
-    )
+        _render_summary(
+            "Grid Search Summary",
+            [("Experiments", str(len(results))), ("Best NDCG@K", f"{best_ndcg:.4f}")],
+        )
 
 
 @retrieval_app.command("experiments")
@@ -447,8 +554,9 @@ def retrieval_experiments(
     experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
 ) -> None:
     """List locally tracked experiments."""
-    _, _, tracker = _load_benchmark_runner(config_path, experiment_directory)
-    records = tracker.list_experiments()
+    with _command_span("retrieval.experiments"):
+        _, _, tracker = _load_benchmark_runner(config_path, experiment_directory)
+        records = _run_with_progress("Loading experiments", tracker.list_experiments)
 
     table = Table(title="Experiments")
     table.add_column("Experiment ID")
@@ -478,10 +586,14 @@ def retrieval_compare(
     experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
 ) -> None:
     """Compare stored experiments side by side."""
-    _, _, tracker = _load_benchmark_runner(config_path, experiment_directory)
-    comparison = ExperimentComparisonEngine(tracker).compare(
-        [item.strip() for item in experiment_ids.split(",") if item.strip()]
-    )
+    with _command_span("retrieval.compare"):
+        _, _, tracker = _load_benchmark_runner(config_path, experiment_directory)
+        comparison = _run_with_progress(
+            "Comparing experiments",
+            lambda: ExperimentComparisonEngine(tracker).compare(
+                [item.strip() for item in experiment_ids.split(",") if item.strip()]
+            ),
+        )
 
     table = Table(title="Experiment Comparison")
     table.add_column("Experiment ID")
@@ -509,13 +621,17 @@ def retrieval_leaderboard(
     sort_by: Annotated[str, SORT_BY_OPTION] = "overall_score",
 ) -> None:
     """Rank stored experiments across quality and performance metrics."""
-    try:
-        metric = parse_sort_metric(sort_by)
-    except ValueError as error:
-        raise typer.BadParameter(str(error)) from error
-    leaderboard = _load_analysis_service(config_path, experiment_directory).get_leaderboard(
-        sort_by=metric
-    )
+    with _command_span("retrieval.leaderboard"):
+        try:
+            metric = parse_sort_metric(sort_by)
+        except ValueError as error:
+            raise typer.BadParameter(str(error)) from error
+        leaderboard = _run_with_progress(
+            "Generating leaderboard",
+            lambda: _load_analysis_service(config_path, experiment_directory).get_leaderboard(
+                sort_by=metric
+            ),
+        )
 
     table = Table(title="Experiment Leaderboard")
     table.add_column("Rank")
@@ -544,20 +660,24 @@ def retrieval_recommend(
     experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
 ) -> None:
     """Recommend the strongest production-ready experiment."""
-    recommendation = _load_analysis_service(config_path, experiment_directory).get_recommendation()
-    _render_summary(
-        "Recommendation Summary",
-        [
-            ("Experiment ID", recommendation.experiment_id),
-            ("Pipeline", recommendation.recommended_pipeline),
-            ("Score", f"{recommendation.overall_score:.4f}"),
-            ("Reason", recommendation.reason),
-            (
-                "Alternatives",
-                ", ".join(recommendation.alternative_configurations) or "None",
-            ),
-        ],
-    )
+    with _command_span("retrieval.recommend"):
+        recommendation = _run_with_progress(
+            "Computing recommendation",
+            lambda: _load_analysis_service(config_path, experiment_directory).get_recommendation(),
+        )
+        _render_summary(
+            "Recommendation Summary",
+            [
+                ("Experiment ID", recommendation.experiment_id),
+                ("Pipeline", recommendation.recommended_pipeline),
+                ("Score", f"{recommendation.overall_score:.4f}"),
+                ("Reason", recommendation.reason),
+                (
+                    "Alternatives",
+                    ", ".join(recommendation.alternative_configurations) or "None",
+                ),
+            ],
+        )
 
 
 @retrieval_app.command("report")
@@ -567,17 +687,21 @@ def retrieval_report(
     experiment_ids: Annotated[str | None, EXPERIMENT_IDS_OPTION] = None,
 ) -> None:
     """Generate markdown, CSV, and JSON reports for experiment history."""
-    selected_ids = None
-    if experiment_ids:
-        selected_ids = [item.strip() for item in experiment_ids.split(",") if item.strip()]
-    artifacts = _load_analysis_service(config_path, experiment_directory).generate_reports(
-        selected_ids
-    )
-    rows = [
-        (experiment_id, ", ".join(paths.values()))
-        for experiment_id, paths in artifacts.items()
-    ]
-    _render_summary("Report Artifacts", rows)
+    with _command_span("retrieval.report"):
+        selected_ids = None
+        if experiment_ids:
+            selected_ids = [item.strip() for item in experiment_ids.split(",") if item.strip()]
+        artifacts = _run_with_progress(
+            "Generating reports",
+            lambda: _load_analysis_service(config_path, experiment_directory).generate_reports(
+                selected_ids
+            ),
+        )
+        rows = [
+            (experiment_id, ", ".join(paths.values()))
+            for experiment_id, paths in artifacts.items()
+        ]
+        _render_summary("Report Artifacts", rows)
 
 
 @retrieval_app.command("visualize")
@@ -586,10 +710,17 @@ def retrieval_visualize(
     experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
 ) -> None:
     """Generate HTML and PNG visualizations for stored experiments."""
-    artifacts = _load_analysis_service(config_path, experiment_directory).generate_visualizations()
-    rows = [(name, path) for name, path in artifacts.html_paths.items()]
-    rows.extend((name, path) for name, path in artifacts.png_paths.items())
-    _render_summary("Visualization Artifacts", rows)
+    with _command_span("retrieval.visualize"):
+        artifacts = _run_with_progress(
+            "Generating visualizations",
+            lambda: _load_analysis_service(
+                config_path,
+                experiment_directory,
+            ).generate_visualizations(),
+        )
+        rows = [(name, path) for name, path in artifacts.html_paths.items()]
+        rows.extend((name, path) for name, path in artifacts.png_paths.items())
+        _render_summary("Visualization Artifacts", rows)
 
 
 @retrieval_app.command("history")
@@ -598,7 +729,11 @@ def retrieval_history(
     experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
 ) -> None:
     """List enriched experiment history, including reports and visualizations."""
-    history = _load_analysis_service(config_path, experiment_directory).get_history()
+    with _command_span("retrieval.history"):
+        history = _run_with_progress(
+            "Loading experiment history",
+            lambda: _load_analysis_service(config_path, experiment_directory).get_history(),
+        )
 
     table = Table(title="Experiment History")
     table.add_column("Experiment ID")

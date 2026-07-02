@@ -2,154 +2,96 @@
 
 ## Overview
 
-The framework is organized as a sequence of interchangeable layers:
+The framework is organized into modular, interchangeable layers:
 
-1. Ingestion discovers supported files and converts them into normalized `Document` models.
-2. Preprocessing applies configurable cleanup and normalization steps.
-3. Chunking converts documents into ordered `Chunk` models.
-4. The document pipeline persists a `ProcessedCorpus` artifact.
-5. The embedding layer turns chunks and queries into reusable vectors.
-6. The index layer persists lexical, dense, or hybrid retrieval structures.
-7. The retrieval layer serves ranked chunk candidates.
-8. Optional query enhancement and reranking refine recall and precision.
-9. Evaluation and benchmarking layers measure retrieval quality and system performance.
-10. Recommendation, reporting, and visualization layers convert experiment history into decisions and artifacts.
-11. CLI and FastAPI surfaces expose the full workflow.
+1. Ingestion
+2. Preprocessing
+3. Chunking
+4. Embedding
+5. Indexing and retrieval
+6. Optional query enhancement and reranking
+7. Evaluation and benchmarking
+8. Recommendation, reporting, and visualization
+9. Interface layer (CLI + API)
 
-## Core Components
+Phase 5 focuses on interface quality and user experience while preserving existing retrieval and benchmarking architecture.
 
-### Configuration
+## CLI Architecture
 
-`AppConfig` is loaded from YAML and owns ingestion, preprocessing, chunking, embedding, indexing, retrieval, query enhancement, reranking, benchmarking, reporting, visualization, recommendation, output, and device settings.
+The CLI is implemented with Typer and split into:
 
-Device resolution is centralized so embeddings, HyDE, reranking, benchmarking, and artifact generation use the same hardware policy.
+- root commands for corpus processing: `ingest`, `preprocess`, `chunk`
+- retrieval namespace commands under `retrieval`
 
-### Data Models
+CLI UX design includes:
 
-Key repository-wide models include:
+- type-driven argument parsing
+- command help text and examples
+- Rich progress bars and tabular output
+- consistent structured command logging
+- user-friendly error messaging without stack trace exposure
 
-- `Document`: canonical representation of ingested content.
-- `Chunk`: chunk artifact with ordering, metadata, and token counts.
-- `ProcessedCorpus`: serialized corpus payload bridging preparation and retrieval.
-- `RetrievalResult`: a scored retrieved chunk.
-- `RetrievalResponse`: a retrieval response with provenance and latency metadata.
-- `EvaluationDataset`: a validated custom benchmark dataset.
-- `ExperimentRecord`: a persisted benchmark and analysis history entry.
-- `BenchmarkResult`: a structured benchmark execution artifact.
-- `Leaderboard`: ranked experiment summary.
-- `RecommendationResult`: explainable best-pipeline selection.
-- `TradeoffAnalysis`: structured observations about quality, latency, and component choices.
+## API Architecture
 
-### Embedding Layer
+FastAPI is now router-based instead of a single endpoint file.
 
-`EmbeddingEngine` is the only object the rest of the system depends on for vector generation. It hides the underlying backend, batches requests, caches vectors to disk, and persists embedding artifacts so dense indexes can be rebuilt without recomputing embeddings.
+Router modules:
 
-Supported behaviors include:
+- `api/routers/system.py` for service health
+- `api/routers/pipeline.py` for ingestion/preprocessing/chunking
+- `api/routers/retrieval.py` for embedding/index/retrieve/search
+- `api/routers/benchmarking.py` for evaluation, benchmark, compare, and phase-4 analysis endpoints
 
-- sentence-transformers for production dense retrieval.
-- a deterministic hashing backend for offline tests and fallbacks.
-- automatic CPU, CUDA, and Apple MPS selection.
+Shared API components:
 
-### Index Layer
+- `api/dependencies.py` for state/cache/config helpers
+- `api/schemas.py` for request/response models
+- `api/app.py` for app wiring, middleware, and global exception handlers
 
-Indexes are responsible for build, save, load, and rebuild operations.
+API behavior includes:
 
-- `BM25Index` persists lexical search structures.
-- `DenseIndex` uses FAISS for dense cosine similarity search.
+- request and response validation via Pydantic
+- standardized user-facing error payloads
+- middleware-based request logging and execution-time headers
+- OpenAPI/Swagger/ReDoc generation by default
 
-Persistence is part of the design so later benchmarking and reporting workflows can reuse index artifacts instead of paying setup cost on every experiment.
+## Configuration Flow
 
-### Retriever Layer
+1. User selects a YAML configuration.
+2. CLI/API loads the config into `AppConfig`.
+3. Config drives pipeline/retrieval/benchmark/recommendation behavior.
+4. Example YAML templates provide reusable starting points for common modes.
 
-All retrievers implement a shared `BaseRetriever` interface with `build_index()`, `retrieve()`, `get_configuration()`, `save_index()`, and `load_index()`.
+Configuration is the primary control plane for reproducibility.
 
-- `BM25Retriever`: lexical search over chunk text.
-- `DenseRetriever`: semantic search over embedding vectors.
-- `HybridRetriever`: merges BM25 and dense rankings with Reciprocal Rank Fusion.
+## Request Flow
 
-The retrieval pipeline depends only on that interface, which keeps benchmarking and downstream analysis decoupled from individual retrieval algorithms.
+### CLI Request Flow
 
-### Query Enhancement Layer
+1. Parse command and typed arguments.
+2. Start command span logging.
+3. Execute action with Rich progress feedback.
+4. Render colored summary table.
+5. Log duration and outcome.
 
-Query enhancement is optional and configuration-driven.
+### API Request Flow
 
-- `QueryExpander` builds a lightweight semantic vocabulary from the indexed corpus.
-- `HyDEQueryEnhancer` generates a hypothetical answer and uses it as the effective retrieval query.
+1. Validate request payload/path/query.
+2. Route to appropriate router handler.
+3. Execute service logic using shared dependency helpers.
+4. Validate response model.
+5. Middleware logs method/path/status/latency and returns `X-Execution-Time-Ms`.
+6. Exceptions are normalized into actionable user-facing error responses.
 
-These components return structured outputs so retrieval code can record which transformation was applied and how much latency it introduced.
+## Engineering Decisions
 
-### Reranking Layer
-
-Reranking is applied after retrieval over the top candidate set.
-
-- cross-encoder reranking is used when transformer models are available.
-- a lexical fallback keeps the pipeline operable in constrained environments.
-
-The retrieval pipeline can operate unchanged with reranking disabled, enabled, or swapped to another reranker implementation later.
-
-### Evaluation Layer
-
-Evaluation is intentionally decoupled from retrieval execution.
-
-- `JsonEvaluationDatasetLoader` validates custom JSON or YAML benchmark datasets.
-- `MetricEvaluator` computes Precision@K, Recall@K, MRR, and NDCG@K independently.
-- relevance metrics are aggregated separately from latency metrics so quality and cost trade-offs remain explicit.
-
-### Benchmarking Layer
-
-`BenchmarkRunner` orchestrates dataset evaluation on top of the retrieval pipeline.
-
-- single experiments benchmark one pipeline configuration.
-- parameter sweeps vary one parameter at a time while the rest stay fixed.
-- grid search executes the full Cartesian product of configuration values.
-- ablation studies compare a baseline configuration against targeted removals or substitutions.
-
-Each experiment records retrieval quality metrics, latency metrics, configuration, device, notes, and generated analysis metadata.
-
-### Analysis And Decision Layer
-
-Phase 4 adds a dedicated analysis layer over stored experiment history.
-
-- `RecommendationEngine` computes a weighted overall score balancing quality, retrieval latency, embedding cost, and index build cost.
-- `LeaderboardEngine` ranks stored experiments by overall score or individual metrics.
-- `TradeoffAnalyzer` derives explainable observations across retrievers, query enhancement strategies, rerankers, and chunking choices.
-- `BenchmarkAnalysisService` coordinates enrichment, persistence, report generation, and visualization generation.
-
-This layer is intentionally built on experiment history rather than benchmark execution so reports can be regenerated without re-running retrieval experiments.
-
-### Reporting Layer
-
-`ReportGenerator` emits three portable formats per experiment:
-
-- Markdown for human-readable summaries.
-- CSV for spreadsheet and BI workflows.
-- JSON for machine-readable automation.
-
-Reports include executive summary text, configuration snapshot, retrieval quality metrics, latency metrics, ranking position, recommendation details, and trade-off observations.
-
-### Visualization Layer
-
-`VisualizationGenerator` emits:
-
-- HTML dashboards for portable review.
-- PNG charts for reports and presentations.
-
-The current charts include leaderboard score views and quality-versus-latency comparisons. Rendering uses a non-interactive backend so artifact generation works in CLI, tests, and FastAPI worker threads.
-
-### Delivery Surfaces
-
-- The Typer CLI supports ingestion, preprocessing, chunking, embedding, indexing, retrieval, evaluation, benchmarking, sweeps, grid search, experiment listing, comparison, leaderboard generation, recommendation, reporting, visualization, and history inspection.
-- The FastAPI app exposes retrieval endpoints plus benchmarking and phase-4 analysis endpoints with OpenAPI documentation.
-
-## Design Rationale
-
-- FAISS was chosen for dense indexing because it is widely used, fast, and easy to persist.
-- BM25 remains necessary because exact-term matching is often decisive on enterprise text.
-- Hybrid retrieval and Reciprocal Rank Fusion provide a strong default without coupling to one retriever family.
-- HyDE and reranking are optional because they can improve quality, but they carry real latency and model cost.
-- Phase-4 analysis is history-driven because recommendations and reports should be reproducible without re-executing experiments.
-- Report and visualization artifacts are persisted by path in experiment history so downstream workflows can reference them consistently.
+- Typer was selected for a production-quality Python CLI with strong type ergonomics.
+- FastAPI was selected for strict validation and built-in API docs.
+- YAML was kept as the source of truth for reproducible experimentation.
+- Both CLI and API are provided so users can choose interactive local workflows or service integration paths.
 
 ## Extensibility
 
-The project keeps responsibilities separated so future work can add larger benchmark datasets, richer dashboards, deployment packaging, and production orchestration without changing the established ingestion, corpus, embedding, retrieval, evaluation, or history contracts.
+Phase-5 interface changes are additive and do not alter retrieval algorithms, metrics, or benchmark semantics.
+
+New interfaces are built on top of existing pipeline contracts, preserving modularity and backward compatibility.

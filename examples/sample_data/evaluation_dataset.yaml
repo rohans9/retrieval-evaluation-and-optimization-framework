@@ -1,0 +1,19 @@
+name: sample_hr_it_dataset
+metadata:
+  domain: hr_and_it
+examples:
+  - query: What is the maternity leave policy?
+    positive_documents:
+      - employee_handbook:0
+    negative_documents:
+      - it_security:0
+  - query: Which policy mentions hybrid schedules?
+    positive_documents:
+      - employee_handbook:1
+    negative_documents:
+      - it_security:0
+  - query: What is mandatory for production system access?
+    positive_documents:
+      - it_security:1
+    negative_documents:
+      - employee_handbook:0
