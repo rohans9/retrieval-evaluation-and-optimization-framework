@@ -270,6 +270,50 @@ class BenchmarkConfig(BaseModel):
         return self
 
 
+class ReportingConfig(BaseModel):
+    """Reporting output configuration."""
+
+    reports_directory: Path = Path("reports/generated")
+    include_csv: bool = True
+    include_json: bool = True
+    include_markdown: bool = True
+
+
+class VisualizationConfig(BaseModel):
+    """Visualization output configuration."""
+
+    output_directory: Path = Path("reports/visualizations")
+    export_html: bool = True
+    export_png: bool = True
+
+
+class RecommendationConfig(BaseModel):
+    """Recommendation scoring configuration."""
+
+    quality_weight: float = 0.65
+    latency_weight: float = 0.2
+    embedding_cost_weight: float = 0.075
+    index_build_weight: float = 0.075
+
+    @model_validator(mode="after")
+    def validate_weights(self) -> RecommendationConfig:
+        """Validate recommendation engine weights.
+
+        Returns:
+            The validated recommendation configuration.
+        """
+        total = (
+            self.quality_weight
+            + self.latency_weight
+            + self.embedding_cost_weight
+            + self.index_build_weight
+        )
+        if not 0.99 <= total <= 1.01:
+            msg = "recommendation weights must sum to approximately 1.0"
+            raise ValueError(msg)
+        return self
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration."""
 
@@ -285,6 +329,9 @@ class AppConfig(BaseModel):
     query_enhancement: QueryEnhancementConfig = Field(default_factory=QueryEnhancementConfig)
     reranking: RerankingConfig = Field(default_factory=RerankingConfig)
     benchmark: BenchmarkConfig = Field(default_factory=BenchmarkConfig)
+    reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+    visualization: VisualizationConfig = Field(default_factory=VisualizationConfig)
+    recommendation: RecommendationConfig = Field(default_factory=RecommendationConfig)
 
     @classmethod
     def load_yaml(cls, path: Path) -> AppConfig:

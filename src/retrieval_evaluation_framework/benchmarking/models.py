@@ -41,6 +41,36 @@ class PerformanceMetrics(BaseModel):
     index_build_time_ms: float
 
 
+class RecommendationResult(BaseModel):
+    """Explainable recommendation over benchmarked pipelines."""
+
+    experiment_id: str
+    recommended_pipeline: str
+    reason: str
+    alternative_configurations: list[str] = Field(default_factory=list)
+    explainability: list[str] = Field(default_factory=list)
+    overall_score: float
+
+
+class TradeoffObservation(BaseModel):
+    """One automatically derived trade-off observation."""
+
+    title: str
+    description: str
+
+
+class TradeoffAnalysis(BaseModel):
+    """Structured trade-off analysis over a set of experiments."""
+
+    observations: list[TradeoffObservation]
+
+
+class ExecutiveSummary(BaseModel):
+    """Programmatic executive summary for a report or history entry."""
+
+    summary: str
+
+
 class QueryBenchmarkResult(BaseModel):
     """Benchmark output for a single dataset query."""
 
@@ -72,6 +102,13 @@ class ExperimentRecord(BaseModel):
     retrieval_quality_metrics: RetrievalQualityMetrics | None = None
     performance_metrics: PerformanceMetrics | None = None
     notes: str | None = None
+    overall_score: float | None = None
+    summary: ExecutiveSummary | None = None
+    recommendation: RecommendationResult | None = None
+    tradeoff_analysis: TradeoffAnalysis | None = None
+    leaderboard_rank: int | None = None
+    report_paths: dict[str, str] = Field(default_factory=dict)
+    visualization_paths: dict[str, str] = Field(default_factory=dict)
 
 
 class BenchmarkResult(BaseModel):
@@ -113,3 +150,51 @@ class ComparisonTable(BaseModel):
     """Structured comparison view over multiple experiments."""
 
     rows: list[ComparisonRow]
+
+
+class LeaderboardRow(BaseModel):
+    """Single row in an experiment leaderboard."""
+
+    experiment_id: str
+    retriever: str
+    embedding_model: str
+    precision_at_k: float
+    recall_at_k: float
+    mean_reciprocal_rank: float
+    ndcg_at_k: float
+    average_latency_ms: float
+    p95_latency_ms: float
+    p99_latency_ms: float
+    embedding_time_ms: float
+    index_build_time_ms: float
+    overall_score: float
+    rank: int
+
+
+class Leaderboard(BaseModel):
+    """Sortable experiment leaderboard."""
+
+    rows: list[LeaderboardRow]
+
+
+class ReportArtifacts(BaseModel):
+    """Paths to generated report files for an experiment."""
+
+    markdown_path: str
+    csv_path: str
+    json_path: str
+
+
+class VisualizationArtifacts(BaseModel):
+    """Paths to generated chart exports."""
+
+    html_paths: dict[str, str] = Field(default_factory=dict)
+    png_paths: dict[str, str] = Field(default_factory=dict)
+
+
+class ExperimentHistoryEntry(BaseModel):
+    """Complete history entry for phase-4 analysis outputs."""
+
+    experiment: ExperimentRecord
+    report_paths: dict[str, str]
+    visualization_paths: dict[str, str]

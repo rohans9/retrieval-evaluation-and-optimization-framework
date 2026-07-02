@@ -15,6 +15,9 @@ def test_load_default_config() -> None:
 
     assert config.chunking.strategy == "recursive"
     assert config.output.processed_corpus_filename == "processed_corpus.json"
+    assert config.reporting.include_markdown is True
+    assert config.visualization.export_png is True
+    assert config.recommendation.quality_weight == 0.65
     assert config.resolved_device in {"cpu", "cuda", "mps"}
 
 

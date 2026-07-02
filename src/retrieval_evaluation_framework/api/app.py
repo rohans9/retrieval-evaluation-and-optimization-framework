@@ -8,11 +8,16 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from retrieval_evaluation_framework.benchmarking.analysis import BenchmarkAnalysisService
 from retrieval_evaluation_framework.benchmarking.comparison import ExperimentComparisonEngine
 from retrieval_evaluation_framework.benchmarking.models import (
     BenchmarkResult,
     ComparisonTable,
+    ExperimentHistoryEntry,
     ExperimentRecord,
+    Leaderboard,
+    RecommendationResult,
+    VisualizationArtifacts,
 )
 from retrieval_evaluation_framework.benchmarking.runner import BenchmarkRunner
 from retrieval_evaluation_framework.benchmarking.tracking import ExperimentTracker
@@ -20,6 +25,7 @@ from retrieval_evaluation_framework.config.settings import AppConfig
 from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
 from retrieval_evaluation_framework.logging import configure_logging
 from retrieval_evaluation_framework.models import ProcessedCorpus, RetrievalResponse
+from retrieval_evaluation_framework.recommendation.leaderboard import parse_sort_metric
 from retrieval_evaluation_framework.retrieval.pipeline import RetrievalPipeline
 
 DEFAULT_CONFIG_PATH = Path("configs/default.yaml")
@@ -88,6 +94,14 @@ def _get_tracker(config: AppConfig, directory: Path | None = None) -> Experiment
         Configured experiment tracker.
     """
     return ExperimentTracker(directory or config.benchmark.experiment_directory)
+
+
+def _get_analysis_service(
+    config: AppConfig,
+    directory: Path | None = None,
+) -> BenchmarkAnalysisService:
+    """Return a phase-4 analysis service over benchmark history."""
+    return BenchmarkAnalysisService(config, _get_tracker(config, directory))
 
 
 def _load_parameter_mapping(payload: dict[str, Any] | None) -> dict[str, list[Any]]:
@@ -244,6 +258,12 @@ class CompareRequest(BaseModel):
     experiment_directory: Path | None = None
 
 
+class ReportResponse(BaseModel):
+    """Response model for generated report artifacts."""
+
+    artifacts: dict[str, dict[str, str]]
+
+
 @app.post("/embed", response_model=EmbedResponse, tags=["retrieval"])
 def embed_corpus(request: EmbedRequest) -> EmbedResponse:
     """Generate and persist embeddings for a processed corpus."""
@@ -389,3 +409,75 @@ def get_experiment(
         return tracker.get_experiment(experiment_id)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/leaderboard", response_model=Leaderboard, tags=["benchmarking"])
+def leaderboard(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    experiment_directory: Path | None = None,
+    sort_by: str = "overall_score",
+) -> Leaderboard:
+    """Return a leaderboard over benchmark history."""
+    config = _load_config(config_path)
+    try:
+        metric = parse_sort_metric(sort_by)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return _get_analysis_service(config, experiment_directory).get_leaderboard(sort_by=metric)
+
+
+@app.get(
+    "/recommendation",
+    response_model=RecommendationResult,
+    tags=["benchmarking"],
+)
+def recommendation(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    experiment_directory: Path | None = None,
+) -> RecommendationResult:
+    """Return the best overall pipeline recommendation."""
+    config = _load_config(config_path)
+    return _get_analysis_service(config, experiment_directory).get_recommendation()
+
+
+@app.get("/reports", response_model=ReportResponse, tags=["benchmarking"])
+def reports(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    experiment_directory: Path | None = None,
+    experiment_ids: str | None = None,
+) -> ReportResponse:
+    """Generate reports for all or selected experiments."""
+    config = _load_config(config_path)
+    selected_ids = None
+    if experiment_ids:
+        selected_ids = [item.strip() for item in experiment_ids.split(",") if item.strip()]
+    artifacts = _get_analysis_service(config, experiment_directory).generate_reports(selected_ids)
+    return ReportResponse(artifacts=artifacts)
+
+
+@app.get(
+    "/visualizations",
+    response_model=VisualizationArtifacts,
+    tags=["benchmarking"],
+)
+def visualizations(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    experiment_directory: Path | None = None,
+) -> VisualizationArtifacts:
+    """Generate shared HTML and PNG benchmark visualizations."""
+    config = _load_config(config_path)
+    return _get_analysis_service(config, experiment_directory).generate_visualizations()
+
+
+@app.get(
+    "/history",
+    response_model=list[ExperimentHistoryEntry],
+    tags=["benchmarking"],
+)
+def history(
+    config_path: Path = DEFAULT_CONFIG_PATH,
+    experiment_directory: Path | None = None,
+) -> list[ExperimentHistoryEntry]:
+    """Return enriched experiment history with report and visualization metadata."""
+    config = _load_config(config_path)
+    return _get_analysis_service(config, experiment_directory).get_history()

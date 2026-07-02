@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from retrieval_evaluation_framework.benchmarking.analysis import BenchmarkAnalysisService
 from retrieval_evaluation_framework.benchmarking.comparison import ExperimentComparisonEngine
 from retrieval_evaluation_framework.benchmarking.models import (
     ExperimentRecord,
@@ -121,3 +122,37 @@ def test_experiment_comparison_engine_returns_rows(tmp_path: Path) -> None:
         first.experiment.experiment_id,
         second.experiment.experiment_id,
     }
+
+
+def test_analysis_service_generates_leaderboard_reports_and_visualizations(
+    tmp_path: Path,
+) -> None:
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    runner.run_single_experiment(config, corpus_path, dataset_path)
+    runner.parameter_sweep(
+        config,
+        corpus_path,
+        dataset_path,
+        sweep_parameters={"retrieval.top_k": [1, 2]},
+    )
+
+    service = BenchmarkAnalysisService(config, tracker)
+    leaderboard = service.get_leaderboard()
+    recommendation = service.get_recommendation()
+    reports = service.generate_reports()
+    visualizations = service.generate_visualizations()
+    history = service.get_history()
+
+    assert len(leaderboard.rows) == 3
+    assert leaderboard.rows[0].rank == 1
+    assert recommendation.experiment_id in reports
+    assert Path(reports[recommendation.experiment_id]["markdown_path"]).exists()
+    assert Path(visualizations.html_paths["leaderboard"]).exists()
+    assert Path(visualizations.png_paths["quality_vs_latency"]).exists()
+    assert history[0].experiment.summary is not None

@@ -85,3 +85,68 @@ def test_evaluate_benchmark_compare_and_experiment_endpoints(tmp_path: Path) -> 
 
     assert compare_response.status_code == 200
     assert len(compare_response.json()["rows"]) == 1
+
+
+def test_phase4_benchmarking_endpoints(tmp_path: Path) -> None:
+    _PIPELINE_CACHE.clear()
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    experiment_directory = tmp_path / "experiments"
+
+    evaluate_response = CLIENT.post(
+        "/evaluate",
+        json={
+            "config_path": str(config_path),
+            "corpus_path": str(corpus_path),
+            "dataset_path": str(dataset_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+    assert evaluate_response.status_code == 200
+
+    leaderboard_response = CLIENT.get(
+        "/leaderboard",
+        params={
+            "config_path": str(config_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+    recommendation_response = CLIENT.get(
+        "/recommendation",
+        params={
+            "config_path": str(config_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+    reports_response = CLIENT.get(
+        "/reports",
+        params={
+            "config_path": str(config_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+    visualizations_response = CLIENT.get(
+        "/visualizations",
+        params={
+            "config_path": str(config_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+    history_response = CLIENT.get(
+        "/history",
+        params={
+            "config_path": str(config_path),
+            "experiment_directory": str(experiment_directory),
+        },
+    )
+
+    assert leaderboard_response.status_code == 200
+    assert recommendation_response.status_code == 200
+    assert reports_response.status_code == 200
+    assert visualizations_response.status_code == 200
+    assert history_response.status_code == 200
+    assert len(leaderboard_response.json()["rows"]) == 1
+    assert "artifacts" in reports_response.json()
+    assert "html_paths" in visualizations_response.json()
+    assert len(history_response.json()) == 1

@@ -11,12 +11,14 @@ import yaml
 from rich.console import Console
 from rich.table import Table
 
+from retrieval_evaluation_framework.benchmarking.analysis import BenchmarkAnalysisService
 from retrieval_evaluation_framework.benchmarking.comparison import ExperimentComparisonEngine
 from retrieval_evaluation_framework.benchmarking.runner import BenchmarkRunner
 from retrieval_evaluation_framework.benchmarking.tracking import ExperimentTracker
 from retrieval_evaluation_framework.config.settings import AppConfig
 from retrieval_evaluation_framework.logging import configure_logging
 from retrieval_evaluation_framework.pipeline import DocumentProcessingPipeline
+from retrieval_evaluation_framework.recommendation.leaderboard import parse_sort_metric
 from retrieval_evaluation_framework.retrieval.pipeline import RetrievalPipeline
 
 app = typer.Typer(help="Retrieval Evaluation & Optimization Framework CLI")
@@ -38,6 +40,7 @@ PARAMETERS_PATH_OPTION = typer.Option("--parameters-path", exists=True, readable
 EXPERIMENT_DIRECTORY_OPTION = typer.Option("--experiment-directory")
 NOTES_OPTION = typer.Option("--notes")
 EXPERIMENT_IDS_OPTION = typer.Option("--experiment-ids")
+SORT_BY_OPTION = typer.Option("--sort-by")
 
 SourcePath = Annotated[Path, SOURCE_PATH_ARGUMENT]
 ConfigPath = Annotated[Path, CONFIG_PATH_OPTION]
@@ -74,6 +77,14 @@ def _load_benchmark_runner(
     configure_logging(config.logging.level)
     tracker = ExperimentTracker(experiment_directory or config.benchmark.experiment_directory)
     return config, BenchmarkRunner(tracker), tracker
+
+
+def _load_analysis_service(
+    config_path: Path,
+    experiment_directory: Path | None = None,
+) -> BenchmarkAnalysisService:
+    config, _, tracker = _load_benchmark_runner(config_path, experiment_directory)
+    return BenchmarkAnalysisService(config, tracker)
 
 
 def _load_parameter_mapping(path: Path) -> dict[str, list[Any]]:
@@ -487,6 +498,125 @@ def retrieval_compare(
             f"{row.mean_reciprocal_rank:.4f}",
             f"{row.ndcg_at_k:.4f}",
             f"{row.average_latency_ms:.2f}",
+        )
+    console.print(table)
+
+
+@retrieval_app.command("leaderboard")
+def retrieval_leaderboard(
+    config_path: ConfigPath = DEFAULT_CONFIG_PATH,
+    experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
+    sort_by: Annotated[str, SORT_BY_OPTION] = "overall_score",
+) -> None:
+    """Rank stored experiments across quality and performance metrics."""
+    try:
+        metric = parse_sort_metric(sort_by)
+    except ValueError as error:
+        raise typer.BadParameter(str(error)) from error
+    leaderboard = _load_analysis_service(config_path, experiment_directory).get_leaderboard(
+        sort_by=metric
+    )
+
+    table = Table(title="Experiment Leaderboard")
+    table.add_column("Rank")
+    table.add_column("Experiment ID")
+    table.add_column("Retriever")
+    table.add_column("MRR")
+    table.add_column("NDCG@K")
+    table.add_column("Avg Latency (ms)")
+    table.add_column("Score")
+    for row in leaderboard.rows:
+        table.add_row(
+            str(row.rank),
+            row.experiment_id,
+            row.retriever,
+            f"{row.mean_reciprocal_rank:.4f}",
+            f"{row.ndcg_at_k:.4f}",
+            f"{row.average_latency_ms:.2f}",
+            f"{row.overall_score:.4f}",
+        )
+    console.print(table)
+
+
+@retrieval_app.command("recommend")
+def retrieval_recommend(
+    config_path: ConfigPath = DEFAULT_CONFIG_PATH,
+    experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
+) -> None:
+    """Recommend the strongest production-ready experiment."""
+    recommendation = _load_analysis_service(config_path, experiment_directory).get_recommendation()
+    _render_summary(
+        "Recommendation Summary",
+        [
+            ("Experiment ID", recommendation.experiment_id),
+            ("Pipeline", recommendation.recommended_pipeline),
+            ("Score", f"{recommendation.overall_score:.4f}"),
+            ("Reason", recommendation.reason),
+            (
+                "Alternatives",
+                ", ".join(recommendation.alternative_configurations) or "None",
+            ),
+        ],
+    )
+
+
+@retrieval_app.command("report")
+def retrieval_report(
+    config_path: ConfigPath = DEFAULT_CONFIG_PATH,
+    experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
+    experiment_ids: Annotated[str | None, EXPERIMENT_IDS_OPTION] = None,
+) -> None:
+    """Generate markdown, CSV, and JSON reports for experiment history."""
+    selected_ids = None
+    if experiment_ids:
+        selected_ids = [item.strip() for item in experiment_ids.split(",") if item.strip()]
+    artifacts = _load_analysis_service(config_path, experiment_directory).generate_reports(
+        selected_ids
+    )
+    rows = [
+        (experiment_id, ", ".join(paths.values()))
+        for experiment_id, paths in artifacts.items()
+    ]
+    _render_summary("Report Artifacts", rows)
+
+
+@retrieval_app.command("visualize")
+def retrieval_visualize(
+    config_path: ConfigPath = DEFAULT_CONFIG_PATH,
+    experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
+) -> None:
+    """Generate HTML and PNG visualizations for stored experiments."""
+    artifacts = _load_analysis_service(config_path, experiment_directory).generate_visualizations()
+    rows = [(name, path) for name, path in artifacts.html_paths.items()]
+    rows.extend((name, path) for name, path in artifacts.png_paths.items())
+    _render_summary("Visualization Artifacts", rows)
+
+
+@retrieval_app.command("history")
+def retrieval_history(
+    config_path: ConfigPath = DEFAULT_CONFIG_PATH,
+    experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
+) -> None:
+    """List enriched experiment history, including reports and visualizations."""
+    history = _load_analysis_service(config_path, experiment_directory).get_history()
+
+    table = Table(title="Experiment History")
+    table.add_column("Experiment ID")
+    table.add_column("Rank")
+    table.add_column("Score")
+    table.add_column("Reports")
+    table.add_column("Visualizations")
+    for entry in history:
+        table.add_row(
+            entry.experiment.experiment_id,
+            str(entry.experiment.leaderboard_rank or "-"),
+            (
+                f"{entry.experiment.overall_score:.4f}"
+                if entry.experiment.overall_score is not None
+                else "-"
+            ),
+            str(len(entry.report_paths)),
+            str(len(entry.visualization_paths)),
         )
     console.print(table)
 
