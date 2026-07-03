@@ -46,6 +46,21 @@ class RetrievalPipeline:
         self.reranker = RerankerFactory.create(config.reranking)
         self._is_built = False
 
+        LOGGER.info(
+            "retrieval_pipeline_initialized",
+            retriever=self.retriever.name,
+            query_enhancement=(
+                self.config.query_enhancement.method
+                if self.query_enhancer
+                else None
+            ),
+            reranker=(
+                type(self.reranker).__name__
+                if self.reranker
+                else None
+            ),
+        )
+
     def load_processed_corpus(self, path: Path) -> ProcessedCorpus:
         """Load a processed corpus produced by the phase-1 pipeline.
 
@@ -117,6 +132,9 @@ class RetrievalPipeline:
         Returns:
             The full retrieval response, including latency and provenance.
         """
+
+        if top_k is not None and top_k <= 0:
+            raise ValueError("top_k must be greater than 0")
         if not self._is_built:
             msg = "The retrieval index has not been built or loaded"
             raise RuntimeError(msg)
@@ -156,6 +174,19 @@ class RetrievalPipeline:
             LOGGER.info("reranking_completed", latency_ms=reranking_ms)
 
         total_ms = (time.perf_counter() - total_start) * 1000
+
+        LOGGER.info(
+            "retrieval_pipeline_summary",
+            retriever=self.retriever.name,
+            original_query=query,
+            effective_query=search_query,
+            top_k=top_k or self.config.retrieval.top_k,
+            enhancement_ms=round(enhancement_ms, 2),
+            retrieval_ms=round(retrieval_ms, 2),
+            reranking_ms=round(reranking_ms, 2),
+            total_ms=round(total_ms, 2),
+        )
+
         return RetrievalResponse(
             query=query,
             enhanced_query=enhanced_query,

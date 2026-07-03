@@ -377,27 +377,50 @@ def _run_retrieve(
     response = pipeline.retrieve(query, top_k=top_k)
     elapsed_ms = (time.perf_counter() - start) * 1000
 
-    table = Table(title=f"Retrieved Chunks (retriever={response.retriever})")
-    table.add_column("Rank")
-    table.add_column("Score")
-    table.add_column("Chunk ID")
-    table.add_column("Text")
+    table = Table(title=f"Retrieved Chunks ({response.retriever.upper()})")
+
+    table.add_column("Rank", justify="right")
+    table.add_column("Score", justify="right")
+    table.add_column("Tokens", justify="right")
+    table.add_column("Document")
+    table.add_column("Chunk")
+    table.add_column("Preview", overflow="fold")
+
     for result in response.results:
-        preview = result.chunk.text[:120].replace("\n", " ")
-        table.add_row(str(result.rank), f"{result.score:.4f}", result.chunk.chunk_id, preview)
+        chunk = result.chunk
+
+        filename = chunk.metadata.get("filename", "-")
+
+        preview = (
+            chunk.text.replace("\n", " ")
+            .replace("  ", " ")
+            .strip()[:160]
+        )
+
+        table.add_row(
+            str(result.rank),
+            f"{result.score:.4f}",
+            str(chunk.token_count),
+            filename,
+            chunk.chunk_id.split(":")[-1],
+            preview,
+        )
+
     console.print(table)
 
+    scores = [r.score for r in response.results]
+
     _render_summary(
-        "Retrieval Metadata",
+        "Retrieval Statistics",
         [
             ("Retriever", response.retriever),
-            ("Reranked", str(response.reranked)),
-            ("Enhanced Query", response.enhanced_query or "-"),
-            ("Retrieval Latency (ms)", f"{response.retrieval_latency_ms:.2f}"),
-            ("Enhancement Latency (ms)", f"{response.enhancement_latency_ms:.2f}"),
-            ("Reranking Latency (ms)", f"{response.reranking_latency_ms:.2f}"),
-            ("Total Latency (ms)", f"{response.total_latency_ms:.2f}"),
-            ("Wall Clock (ms)", f"{elapsed_ms:.2f}"),
+            ("Results", str(len(response.results))),
+            ("Best Score", f"{max(scores):.4f}" if scores else "-"),
+            ("Worst Score", f"{min(scores):.4f}" if scores else "-"),
+            (
+                "Average Score",
+                f"{sum(scores)/len(scores):.4f}" if scores else "-",
+            ),
         ],
     )
 

@@ -63,8 +63,13 @@ class BenchmarkAnalysisService:
         selected = self._filter_experiments(experiments, experiment_ids)
         artifacts: dict[str, dict[str, str]] = {}
         for experiment in selected:
+            if (
+                experiment.retrieval_quality_metrics is None
+                or experiment.performance_metrics is None
+            ):
+                continue
             if experiment.tradeoff_analysis is None:
-                raise ValueError("Trade-off analysis missing for experiment history")
+                continue
             report_artifacts = self.report_generator.generate(
                 experiment,
                 recommendation,
@@ -73,6 +78,8 @@ class BenchmarkAnalysisService:
             experiment.report_paths = report_artifacts.model_dump()
             self.tracker.save(experiment)
             artifacts[experiment.experiment_id] = experiment.report_paths
+        if not artifacts:
+            raise ValueError("No reportable experiments found in history")
         self.tracker.export_index()
         return artifacts
 

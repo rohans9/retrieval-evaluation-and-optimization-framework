@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from retrieval_evaluation_framework.benchmarking.analysis import BenchmarkAnalysisService
 from retrieval_evaluation_framework.benchmarking.comparison import ExperimentComparisonEngine
 from retrieval_evaluation_framework.benchmarking.models import (
@@ -156,3 +158,26 @@ def test_analysis_service_generates_leaderboard_reports_and_visualizations(
     assert Path(visualizations.html_paths["leaderboard"]).exists()
     assert Path(visualizations.png_paths["quality_vs_latency"]).exists()
     assert history[0].experiment.summary is not None
+
+
+def test_benchmark_runner_raises_for_misaligned_dataset_labels(tmp_path: Path) -> None:
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = tmp_path / "dataset_misaligned.yaml"
+    dataset_path.write_text(
+        """
+name: misaligned_fixture
+examples:
+  - query: What is the maternity leave policy?
+    positive_documents:
+      - unknown_doc:99
+""".strip(),
+        encoding="utf-8",
+    )
+
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    with pytest.raises(ValueError, match="Dataset labels do not match corpus identifiers"):
+        runner.run_single_experiment(config, corpus_path, dataset_path)

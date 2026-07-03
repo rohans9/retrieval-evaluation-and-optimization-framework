@@ -72,14 +72,14 @@ name: e2e_dataset
 examples:
   - query: What is the maternity leave policy?
     positive_documents:
-      - sample:0
+            - sample
     negative_documents:
-      - sample:2
+            - unrelated
   - query: Which policy mentions hybrid schedules?
     positive_documents:
-      - sample:1
+            - sample
     negative_documents:
-      - sample:2
+            - unrelated
 """.strip(),
         encoding="utf-8",
     )

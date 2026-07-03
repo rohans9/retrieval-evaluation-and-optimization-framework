@@ -65,13 +65,13 @@ class HybridRetriever(BaseRetriever):
 
     def save_index(self, directory: Path) -> None:
         """Persist both underlying indexes to disk."""
-        self.bm25_retriever.save_index(_ensure_subdirectory(directory, "bm25"))
-        self.dense_retriever.save_index(_ensure_subdirectory(directory, "dense"))
+        self.bm25_retriever.save_index(directory)
+        self.dense_retriever.save_index(directory)
 
     def load_index(self, directory: Path) -> None:
         """Load both underlying indexes from disk."""
-        self.bm25_retriever.load_index(directory / "bm25")
-        self.dense_retriever.load_index(directory / "dense")
+        self.bm25_retriever.load_index(directory)
+        self.dense_retriever.load_index(directory)
 
 
 def _ensure_subdirectory(directory: Path, name: str) -> Path:

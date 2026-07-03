@@ -70,6 +70,9 @@ class DenseRetriever(BaseRetriever):
 
     def save_index(self, directory: Path) -> None:
         """Persist the dense index and chunk metadata to disk."""
+        directory = directory / "dense"
+        directory.mkdir(parents=True, exist_ok=True)
+
         self._index.save(directory)
         chunk_payload = json.dumps(
             [chunk.model_dump(mode="json") for chunk in self._chunk_by_id.values()]
@@ -78,7 +81,14 @@ class DenseRetriever(BaseRetriever):
 
     def load_index(self, directory: Path) -> None:
         """Load a previously persisted dense index and chunk metadata."""
+        directory = directory / "dense"
+
         self._index.load(directory)
-        payload = json.loads((directory / "chunk_metadata.json").read_text(encoding="utf-8"))
+
+        payload = json.loads(
+            (directory / "chunk_metadata.json").read_text(
+                encoding="utf-8"
+            )
+        )
         chunks = [Chunk.model_validate(item) for item in payload]
         self._chunk_by_id = {chunk.chunk_id: chunk for chunk in chunks}

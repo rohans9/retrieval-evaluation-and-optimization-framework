@@ -22,8 +22,33 @@ def _sentences(text: str) -> list[str]:
 
 
 def _token_chunks(tokens: list[str], chunk_size: int, overlap: int) -> list[str]:
-    step = chunk_size - overlap
-    return [" ".join(tokens[index : index + chunk_size]) for index in range(0, len(tokens), step)]
+    """Generate overlapping token chunks while avoiding tiny trailing chunks."""
+
+    if not tokens:
+        return []
+
+    step = max(1, chunk_size - overlap)
+    chunks: list[str] = []
+
+    for index in range(0, len(tokens), step):
+        window = tokens[index : index + chunk_size]
+
+        if not window:
+            break
+
+        # Merge very small trailing chunk into previous
+        if (
+            chunks
+            and len(window) < max(15, chunk_size // 3)
+        ):
+            previous = chunks.pop().split()
+            merged = previous + window
+            chunks.append(" ".join(merged))
+            break
+
+        chunks.append(" ".join(window))
+
+    return chunks
 
 
 def _split_recursively(text: str, chunk_size: int, separators: Sequence[str]) -> list[str]:
@@ -62,6 +87,28 @@ def _merge_segments(segments: Sequence[str], chunk_size: int) -> list[str]:
     if current:
         merged.append(current.strip())
     return merged
+
+def _apply_overlap(
+    chunks: list[str],
+    overlap: int,
+) -> list[str]:
+    """Apply token overlap to already merged chunks."""
+
+    if overlap <= 0:
+        return chunks
+
+    overlapped = [chunks[0]]
+
+    for chunk in chunks[1:]:
+        previous_tokens = TOKEN_PATTERN.findall(overlapped[-1])
+
+        overlap_tokens = previous_tokens[-overlap:]
+
+        overlapped.append(
+            " ".join(overlap_tokens) + "\n\n" + chunk
+        )
+
+    return overlapped
 
 
 def _cosine_similarity(left: Counter[str], right: Counter[str]) -> float:
@@ -105,11 +152,43 @@ class RecursiveChunker(BaseChunker):
             self.config.chunk_size,
             ["\n\n", "\n", ". ", " "],
         )
-        chunk_texts = _merge_segments(segments, self.config.chunk_size)
+        chunk_texts = _merge_segments(
+            segments,
+            self.config.chunk_size,
+        )
+
+        chunk_texts = _apply_overlap(
+            chunk_texts,
+            self.config.overlap,
+        )
+
+        clean_chunks = []
+
+        for chunk in chunk_texts:
+            chunk = re.sub(r"\n{3,}", "\n\n", chunk)
+            chunk = chunk.strip()
+
+            if count_tokens(chunk) < 15:
+                continue
+
+            clean_chunks.append(chunk)
+
         chunks = [
-            self.make_chunk(document, chunk_text, position)
-            for position, chunk_text in enumerate(chunk_texts)
+            self.make_chunk(document, chunk, position)
+            for position, chunk in enumerate(clean_chunks)
         ]
+
+        token_counts = [count_tokens(c.text) for c in chunks]
+
+        LOGGER.info(
+            "chunk_statistics",
+            document_id=document.id,
+            chunk_count=len(chunks),
+            average_tokens=round(sum(token_counts) / len(token_counts), 2) if token_counts else 0,
+            min_tokens=min(token_counts) if token_counts else 0,
+            max_tokens=max(token_counts) if token_counts else 0,
+        )
+
         LOGGER.info("recursive_chunks_generated", document_id=document.id, chunk_count=len(chunks))
         return chunks
 
@@ -177,10 +256,33 @@ class SemanticChunker(BaseChunker):
                 )
             )
 
+        clean_chunks = []
+
+        for chunk in chunk_texts:
+            chunk = re.sub(r"\n{3,}", "\n\n", chunk)
+            chunk = chunk.strip()
+
+            if count_tokens(chunk) < 15:
+                continue
+
+            clean_chunks.append(chunk)
+
         chunks = [
-            self.make_chunk(document, chunk_text, position)
-            for position, chunk_text in enumerate(normalized_chunks)
+            self.make_chunk(document, chunk, position)
+            for position, chunk in enumerate(clean_chunks)
         ]
+
+        token_counts = [count_tokens(c.text) for c in chunks]
+
+        LOGGER.info(
+            "chunk_statistics",
+            document_id=document.id,
+            chunk_count=len(chunks),
+            average_tokens=round(sum(token_counts) / len(token_counts), 2) if token_counts else 0,
+            min_tokens=min(token_counts) if token_counts else 0,
+            max_tokens=max(token_counts) if token_counts else 0,
+        )
+
         LOGGER.info("semantic_chunks_generated", document_id=document.id, chunk_count=len(chunks))
         return chunks
 

@@ -150,6 +150,7 @@ class BenchmarkRunner:
         try:
             pipeline = RetrievalPipeline(config)
             corpus = pipeline.load_processed_corpus(corpus_path)
+            self._validate_dataset_alignment(dataset.examples, corpus.chunks)
             experiment.selected_device = (
                 pipeline.embedding_engine.device
                 if pipeline.embedding_engine is not None
@@ -165,10 +166,19 @@ class BenchmarkRunner:
             for sample in dataset.examples:
                 response = pipeline.retrieve(sample.query, top_k=config.retrieval.top_k)
                 latencies_ms.append(response.total_latency_ms)
-                relevance_flags = [
-                    self._is_relevant(result, sample.positive_documents)
-                    for result in response.results[: config.retrieval.top_k]
-                ]
+                seen_positive_labels: set[str] = set()
+                relevance_flags: list[bool] = []
+                for result in response.results[: config.retrieval.top_k]:
+                    matched_label = self._matched_positive_label(
+                        result,
+                        sample.positive_documents,
+                    )
+                    is_new_match = (
+                        matched_label is not None and matched_label not in seen_positive_labels
+                    )
+                    if matched_label is not None:
+                        seen_positive_labels.add(matched_label)
+                    relevance_flags.append(is_new_match)
                 metrics = MetricEvaluator.evaluate_query(
                     relevance_flags=relevance_flags,
                     relevant_total=len(sample.positive_documents),
@@ -288,16 +298,73 @@ class BenchmarkRunner:
         )
 
     @staticmethod
-    def _is_relevant(result: RetrievalResult, positive_documents: list[str]) -> bool:
-        chunk = result.chunk
-        identifiers = {
+    def _chunk_identifiers(chunk: Chunk) -> set[str]:
+        return {
             chunk.chunk_id,
             chunk.document_id,
             chunk.text,
             chunk.metadata.get("title", ""),
             chunk.metadata.get("source", ""),
         }
-        return any(positive in identifiers for positive in positive_documents)
+
+    @classmethod
+    def _matched_positive_label(
+        cls,
+        result: RetrievalResult,
+        positive_documents: list[str],
+    ) -> str | None:
+        identifiers = cls._chunk_identifiers(result.chunk)
+        for positive in positive_documents:
+            if positive in identifiers:
+                return positive
+        return None
+
+    @classmethod
+    def _is_relevant(cls, result: RetrievalResult, positive_documents: list[str]) -> bool:
+        return cls._matched_positive_label(result, positive_documents) is not None
+
+    @classmethod
+    def _validate_dataset_alignment(
+        cls,
+        samples: list[Any],
+        chunks: list[Chunk],
+    ) -> None:
+        if not samples or not chunks:
+            return
+
+        corpus_identifiers: set[str] = set()
+        for chunk in chunks:
+            corpus_identifiers.update(cls._chunk_identifiers(chunk))
+
+        positive_labels = {
+            label
+            for sample in samples
+            for label in getattr(sample, "positive_documents", [])
+        }
+        if not positive_labels:
+            return
+
+        matched_count = sum(1 for label in positive_labels if label in corpus_identifiers)
+        if matched_count > 0:
+            return
+
+        example_chunk_ids = sorted(chunk.chunk_id for chunk in chunks)[:5]
+        example_sources = sorted(
+            {
+                str(chunk.metadata.get("source", ""))
+                for chunk in chunks
+                if chunk.metadata.get("source")
+            }
+        )[:3]
+        msg = (
+            "Dataset labels do not match corpus identifiers. "
+            "No positive_documents entry matches any chunk_id/document_id/title/source in the "
+            "processed corpus. Regenerate labels for this corpus or use stable labels such as source "
+            "paths/titles. "
+            f"Example corpus chunk_ids: {example_chunk_ids}. "
+            f"Example corpus sources: {example_sources}."
+        )
+        raise ValueError(msg)
 
     @staticmethod
     def _merge_notes(notes: str | None, suffix: str) -> str:

@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from csv import reader
+from importlib import metadata
 import hashlib
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
-from docx import Document as DocxDocument
+from docx import Document as DocxDocument, text
 from pypdf import PdfReader
 
 from retrieval_evaluation_framework.ingestion.base import DocumentLoader
@@ -15,9 +19,19 @@ from retrieval_evaluation_framework.models import Document, FileType
 
 LOGGER = get_logger(component="ingestion")
 
+LIGATURE_MAP = {
+    "\ufb00": "ff",
+    "\ufb01": "fi",
+    "\ufb02": "fl",
+    "\ufb03": "ffi",
+    "\ufb04": "ffl",
+    "\ufb05": "st",
+    "\ufb06": "st",
+}
 
 def _build_document_id(file_path: Path, text: str) -> str:
-    digest = hashlib.sha256(f"{file_path.resolve()}::{text}".encode()).hexdigest()
+    # Use filename + content so IDs stay stable across machines and repo locations.
+    digest = hashlib.sha256(f"{file_path.name}::{text}".encode()).hexdigest()
     return digest[:16]
 
 
@@ -30,6 +44,38 @@ def _base_metadata(file_path: Path) -> dict[str, Any]:
         "modified_at": stat.st_mtime,
     }
 
+def normalize_pdf_text(text: str) -> str:
+    """Normalize extracted PDF text."""
+
+    # Unicode normalization
+    text = unicodedata.normalize("NFKC", text)
+
+    # Replace common ligatures
+    for ligature, replacement in LIGATURE_MAP.items():
+        text = text.replace(ligature, replacement)
+
+    # Remove replacement characters
+    text = text.replace("\ufffd", "")
+
+    # Remove soft hyphens
+    text = text.replace("\u00ad", "")
+
+    # Normalize line endings
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Collapse spaces
+    text = re.sub(r"[ \t]+", " ", text)
+
+    # Collapse excessive blank lines
+    text = re.sub(r"\n{3,}", "\n\n", text)
+
+    # Remove invisible Unicode characters
+    text = re.sub(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]", "", text)
+
+    # Remove duplicate spaces around newlines
+    text = re.sub(r" *\n *", "\n", text)
+
+    return text.strip()
 
 class TextLoader(DocumentLoader):
     """Loader for plain-text documents."""
@@ -72,10 +118,36 @@ class PdfLoader(DocumentLoader):
 
     def load(self, file_path: Path) -> Document:
         reader = PdfReader(str(file_path))
-        page_text = [page.extract_text() or "" for page in reader.pages]
+        page_text = []
+
+        for page_number, page in enumerate(reader.pages, start=1):
+            try:
+                extracted = page.extract_text(extraction_mode="layout") or ""
+            except TypeError:
+                # Older versions of pypdf don't support extraction_mode
+                extracted = page.extract_text() or ""
+
+            extracted = normalize_pdf_text(extracted)
+
+            if len(extracted.strip()) < 20:
+                LOGGER.warning(
+                    "poor_pdf_extraction",
+                    path=str(file_path),
+                    page=page_number,
+                )
+
+            page_text.append(extracted)
+
         text = "\f".join(page_text)
+
         metadata = _base_metadata(file_path)
+
         metadata["page_count"] = len(reader.pages)
+        metadata["extraction"] = {
+            "engine": "pypdf",
+            "pages": len(reader.pages),
+            "characters": len(text),
+        }
         if reader.metadata:
             metadata["pdf_metadata"] = {
                 str(key): str(value) for key, value in reader.metadata.items()

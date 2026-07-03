@@ -1,19 +1,43 @@
-name: sample_hr_it_dataset
+name: sbi_policy_benchmark_v1
+
 metadata:
-  domain: hr_and_it
+  domain: insurance
+  description: Starter benchmark for SBI General Insurance policies
+
 examples:
-  - query: What is the maternity leave policy?
+
+  - query: What is the purpose of the Loan Insurance Policy Prospectus?
     positive_documents:
-      - employee_handbook:0
+      - Loan_Insurance_Policy_Prospectus_20251001_6c5f75cfb3
     negative_documents:
-      - it_security:0
-  - query: Which policy mentions hybrid schedules?
+      - Super_Health_Insurance_Prospectus_d913e89b45
+
+  - query: Which document contains the Standard Exclusions section?
     positive_documents:
-      - employee_handbook:1
+      - SBI_General_Health_Alpha_Prospectus_20260301_002_70422d8179
     negative_documents:
-      - it_security:0
-  - query: What is mandatory for production system access?
+      - Loan_Insurance_Policy_Prospectus_20251001_6c5f75cfb3
+
+  - query: What expenses are excluded under Investigation and Evaluation?
     positive_documents:
-      - it_security:1
+      - SBI_General_Health_Alpha_Prospectus_20260301_002_70422d8179
     negative_documents:
-      - employee_handbook:0
+      - Super_Health_Insurance_Prospectus_d913e89b45
+
+  - query: What is the exclusion related to Rest Cure and Rehabilitation?
+    positive_documents:
+      - SBI_General_Health_Alpha_Prospectus_20260301_002_70422d8179
+    negative_documents:
+      - Loan_Insurance_Policy_Prospectus_20251001_6c5f75cfb3
+
+  - query: Where can I find the grievance redressal information?
+    positive_documents:
+      - Super_Health_Insurance_Prospectus_d913e89b45
+    negative_documents:
+      - SBI_General_Health_Alpha_Prospectus_20260301_002_70422d8179
+
+  - query: Which section contains the disclaimer of the Super Health Insurance policy?
+    positive_documents:
+      - Super_Health_Insurance_Prospectus_d913e89b45
+    negative_documents:
+      - Loan_Insurance_Policy_Prospectus_20251001_6c5f75cfb3

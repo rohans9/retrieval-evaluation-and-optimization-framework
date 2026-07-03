@@ -51,8 +51,12 @@ class BM25Retriever(BaseRetriever):
 
     def save_index(self, directory: Path) -> None:
         """Persist the BM25 index to disk."""
+        directory = directory / "bm25"
+        directory.mkdir(parents=True, exist_ok=True)
         self._index.save(directory)
 
     def load_index(self, directory: Path) -> None:
         """Load a previously persisted BM25 index from disk."""
+        # self._index.load(directory)
+        directory = directory / "bm25"
         self._index.load(directory)

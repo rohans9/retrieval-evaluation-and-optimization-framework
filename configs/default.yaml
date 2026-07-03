@@ -2,7 +2,7 @@ device: auto
 logging:
   level: INFO
 ingestion:
-  input_directory: data/input
+  input_directory: data/policies
   recursive: true
   supported_extensions:
     - .pdf
@@ -60,12 +60,12 @@ query_enhancement:
     generator_model: gpt2
     max_new_tokens: 48
 reranking:
-  enabled: false
+  enabled: true
   backend: auto
   model_name: cross-encoder/ms-marco-MiniLM-L-6-v2
   top_n: 5
 benchmark:
-  dataset_path:
+  dataset_path: data/evaluation/policy_eval_dataset.json
   experiment_directory: reports/experiments
   results_directory: reports/benchmarks
   test_split_ratio: 0.2

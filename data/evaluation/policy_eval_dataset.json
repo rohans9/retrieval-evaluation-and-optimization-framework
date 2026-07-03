@@ -1,0 +1,664 @@
+{
+  "examples": [
+    {
+      "query": "What three fortuitous life events are covered under the Loan Insurance Policy to relieve stress?",
+      "positive_documents": [
+        "de791e057530a494:0",
+        "de791e057530a494:1"
+      ]
+    },
+    {
+      "query": "What is the survival period requirement from the date of first diagnosis for critical illness benefit under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:2"
+      ]
+    },
+    {
+      "query": "Which specific illnesses are listed under category A for first diagnosis under Critical Illness in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:2",
+        "de791e057530a494:3"
+      ]
+    },
+    {
+      "query": "What pathological confirmation is required to support the diagnosis of a malignant tumor under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:3",
+        "de791e057530a494:4"
+      ]
+    },
+    {
+      "query": "Which cervical conditions are explicitly excluded under the carcinoma-in-situ exceptions of the Cancer definition in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:4"
+      ]
+    },
+    {
+      "query": "What is the threshold Gleason score required for a prostate tumor to be covered under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:5"
+      ]
+    },
+    {
+      "query": "What thyroid condition is excluded if its diameter is less than 1 cm under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:5"
+      ]
+    },
+    {
+      "query": "Are prostate tumors covered if they are accompanied by a specific viral infection under the Loan Insurance Policy exclusions?",
+      "positive_documents": [
+        "de791e057530a494:5"
+      ]
+    },
+    {
+      "query": "What specific treatment criteria confirm Kidney Failure under the Loan Insurance Policy definition?",
+      "positive_documents": [
+        "de791e057530a494:5",
+        "de791e057530a494:6"
+      ]
+    },
+    {
+      "query": "What threshold pressure in mm of Hg during Cardiac Catheterization confirms Primary Pulmonary Hypertension?",
+      "positive_documents": [
+        "de791e057530a494:6"
+      ]
+    },
+    {
+      "query": "How does Class IV of the NYHA Classification characterize physical activity and resting symptoms?",
+      "positive_documents": [
+        "de791e057530a494:6",
+        "de791e057530a494:7"
+      ]
+    },
+    {
+      "query": "What are the three criteria required to unequivocally support a diagnosis of Multiple Sclerosis in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:7",
+        "de791e057530a494:8"
+      ]
+    },
+    {
+      "query": "Which two neurological conditions or causes are explicitly excluded from the Multiple Sclerosis coverage under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:8"
+      ]
+    },
+    {
+      "query": "Which human organs are listed for potential transplantation under the Major Organ Transplant cover in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:8",
+        "de791e057530a494:9"
+      ]
+    },
+    {
+      "query": "What types of transplants are explicitly excluded from the Major Organ Transplant section of the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:9"
+      ]
+    },
+    {
+      "query": "What diagnostic procedure must support a coronary artery bypass graft operation under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:9",
+        "de791e057530a494:10"
+      ]
+    },
+    {
+      "query": "Which procedures are excluded from the definition of coronary artery bypass grafts in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:10"
+      ]
+    },
+    {
+      "query": "Does the Aorta Graft Surgery definition under the Loan Insurance Policy cover replacement following a traumatic injury?",
+      "positive_documents": [
+        "de791e057530a494:11"
+      ]
+    },
+    {
+      "query": "What specific diagnostic tool is required to support the diagnosis of a heart valve abnormality in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:11",
+        "de791e057530a494:12"
+      ]
+    },
+    {
+      "query": "What duration of evidence for a permanent neurological deficit must be produced for a stroke claim under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:12"
+      ]
+    },
+    {
+      "query": "What clinical syndromes or cardiac variants are excluded under the Myocardial Infarction definition of the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:13",
+        "de791e057530a494:14"
+      ]
+    },
+    {
+      "query": "What continuous duration of unresponsiveness to external stimuli is required to support a Coma diagnosis in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:14"
+      ]
+    },
+    {
+      "query": "What specific cause of Coma is explicitly listed as an exclusion under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:15"
+      ]
+    },
+    {
+      "query": "How is paralysis defined in terms of limbs and time duration under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:15",
+        "de791e057530a494:16"
+      ]
+    },
+    {
+      "query": "What alternative options define Permanent Total Disablement under Section II of the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:16"
+      ]
+    },
+    {
+      "query": "What is the maximum number of EMIs payable by the company under Section III (Loss of Job) of the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:18",
+        "de791e057530a494:19"
+      ]
+    },
+    {
+      "query": "What are the entry and exit age limits for eligibility under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:19",
+        "de791e057530a494:20"
+      ]
+    },
+    {
+      "query": "What is the general waiting period and minimum sum insured under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:20"
+      ]
+    },
+    {
+      "query": "Under what conditions is a proposer required to undergo a satisfactory medical examination in the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:21"
+      ]
+    },
+    {
+      "query": "How many days is the Free Look Period for a new individual policy under the Loan Insurance prospectus?",
+      "positive_documents": [
+        "de791e057530a494:22",
+        "de791e057530a494:23"
+      ]
+    },
+    {
+      "query": "What duration of continuous unemployment defines the Retrenchment Period required to make a claim admissible under Section III of the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:25",
+        "de791e057530a494:26"
+      ]
+    },
+    {
+      "query": "What premium discount is allowed if a proposer is not a salaried employee under the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:26"
+      ]
+    },
+    {
+      "query": "What types of employment sectors or contract statuses are excluded from receiving payments under Section III of the Loan Insurance Policy?",
+      "positive_documents": [
+        "de791e057530a494:33"
+      ]
+    },
+    {
+      "query": "Is a claim payable under Section III of the Loan Insurance policy if the unemployment occurs while the insured was on probation?",
+      "positive_documents": [
+        "de791e057530a494:34"
+      ]
+    },
+    {
+      "query": "What percentage of premium is refunded if a policyholder cancels a one-year policy after up to three months on risk?",
+      "positive_documents": [
+        "de791e057530a494:41"
+      ]
+    },
+    {
+      "query": "Under the Clause AC1 for reducing sum insured covers, how is the sum insured determined on the date of the event?",
+      "positive_documents": [
+        "de791e057530a494:44",
+        "de791e057530a494:45"
+      ]
+    },
+    {
+      "query": "Are premium refunds permitted under the Loan Insurance Policy if a part prepayment of the loan is completed?",
+      "positive_documents": [
+        "de791e057530a494:48",
+        "de791e057530a494:49"
+      ]
+    },
+    {
+      "query": "What is the name of Stage 1 for the Redressal of Grievances mentioned across the insurance prospectuses?",
+      "positive_documents": [
+        "de791e057530a494:51"
+      ]
+    },
+    {
+      "query": "What is the turnaround time target in business days for a response from the Head of Customer Care?",
+      "positive_documents": [
+        "de791e057530a494:52"
+      ]
+    },
+    {
+      "query": "What is the continuous moratorium period milestone in health insurance policies after which a claim cannot be contested on non-disclosure grounds?",
+      "positive_documents": [
+        "bb31517562c7a364:80",
+        "bb31517562c7a364:81"
+      ]
+    },
+    {
+      "query": "What is the premium reward option for a claim free renewal under the SBI General Health Alpha Policy?",
+      "positive_documents": [
+        "bb31517562c7a364:1",
+        "bb31517562c7a364:2"
+      ]
+    },
+    {
+      "query": "What is the exclusive industry-first cover targeting gym and fitness injuries under the Health Alpha prospectus?",
+      "positive_documents": [
+        "bb31517562c7a364:2"
+      ]
+    },
+    {
+      "query": "What percentage discount is rewarded if a patient seeks treatment in a Preferred Partner Network Hospital under the Health Alpha policy?",
+      "positive_documents": [
+        "bb31517562c7a364:2",
+        "bb31517562c7a364:3"
+      ]
+    },
+    {
+      "query": "What welcome discount is assured if the Health Alpha policy is purchased within 5 days of receiving the quote?",
+      "positive_documents": [
+        "bb31517562c7a364:3"
+      ]
+    },
+    {
+      "query": "What is the maximum entry age for Personal Accident base cover under the Health Alpha product?",
+      "positive_documents": [
+        "bb31517562c7a364:3"
+      ]
+    },
+    {
+      "query": "What is the maximum number of adults that can be included in a single Family Floater policy under the Health Alpha guidelines?",
+      "positive_documents": [
+        "bb31517562c7a364:4"
+      ]
+    },
+    {
+      "query": "What are the allowed pre-hospitalization and post-hospitalization duration options in the Health Alpha cover?",
+      "positive_documents": [
+        "bb31517562c7a364:5"
+      ]
+    },
+    {
+      "query": "What specific continuous duration must a patient remain hospitalized to qualify for the Convalescence benefit under Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:5",
+        "bb31517562c7a364:6"
+      ]
+    },
+    {
+      "query": "What fixed daily allowance options are available under the Companion Cover benefit of the Health Alpha policy?",
+      "positive_documents": [
+        "bb31517562c7a364:6"
+      ]
+    },
+    {
+      "query": "What age restrictions apply for an individual wishing to be protected under the Adventure Sports optional cover of Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:6"
+      ]
+    },
+    {
+      "query": "List five of the physical fitness injuries protected under the Gym and Sports Injury section of Health Alpha.",
+      "positive_documents": [
+        "bb31517562c7a364:6",
+        "bb31517562c7a364:7"
+      ]
+    },
+    {
+      "query": "What parameters define the refractive error vision correction limit for surgical interventions under the Health Alpha policy?",
+      "positive_documents": [
+        "bb31517562c7a364:7"
+      ]
+    },
+    {
+      "query": "What are the core eligibility rules for utilizing the Endless Sum Insured option in the Health Alpha product?",
+      "positive_documents": [
+        "bb31517562c7a364:7"
+      ]
+    },
+    {
+      "query": "How many days within a life event must a spouse or newborn baby be added under the Plan Ahead continuity benefit of Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:7"
+      ]
+    },
+    {
+      "query": "What age restriction applies to females seeking coverage for Maternity Expenses under the Health Alpha policy?",
+      "positive_documents": [
+        "bb31517562c7a364:7",
+        "bb31517562c7a364:8"
+      ]
+    },
+    {
+      "query": "What advanced reproductive services are covered under the Assisted Reproduction Treatment plan of Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:8"
+      ]
+    },
+    {
+      "query": "What compensation is provided for the loss of a great toe with both phalanges under the Permanent Partial Disablement scale of Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:8"
+      ]
+    },
+    {
+      "query": "What payment factor is applicable for the total loss of four fingers and a thumb of one hand under the Health Alpha PA section?",
+      "positive_documents": [
+        "bb31517562c7a364:8",
+        "bb31517562c7a364:9"
+      ]
+    },
+    {
+      "query": "What co-payment options are available under the optional outpatient diagnostic and pharmacy OPD cover of Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:9"
+      ]
+    },
+    {
+      "query": "What is the initial general exclusion waiting period for treatment of any illness within the first days of the Health Alpha policy?",
+      "positive_documents": [
+        "bb31517562c7a364:10"
+      ]
+    },
+    {
+      "query": "What is the standard waiting period for Bariatric Surgery under the Health Alpha policy guidelines?",
+      "positive_documents": [
+        "bb31517562c7a364:11"
+      ]
+    },
+    {
+      "query": "What is the specific restriction regarding dietary supplements under standard health exclusion Code-Excl14 in Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:11",
+        "bb31517562c7a364:12"
+      ]
+    },
+    {
+      "query": "How are unproven treatments defined in the standard health exclusions section under Code-Excl16?",
+      "positive_documents": [
+        "bb31517562c7a364:12"
+      ]
+    },
+    {
+      "query": "What are the grace period rules for health insurance premium payment instalments under monthly versus quarterly options in Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:14",
+        "bb31517562c7a364:15"
+      ]
+    },
+    {
+      "query": "What penalty interest is the claimant entitled to receive if a health claim is not settled within 15 days under the provisions of Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:16"
+      ]
+    },
+    {
+      "query": "What is the claim notification timeline required for an emergency hospitalization under the standard claims procedures?",
+      "positive_documents": [
+        "bb31517562c7a364:17"
+      ]
+    },
+    {
+      "query": "Within how many days after discharge from a hospital must a claim be submitted for reimbursement processing?",
+      "positive_documents": [
+        "bb31517562c7a364:19"
+      ]
+    },
+    {
+      "query": "What formula calculates the pro-rated claim share if a patient selects an ineligible higher room category under Clause O.3(g)?",
+      "positive_documents": [
+        "bb31517562c7a364:20"
+      ]
+    },
+    {
+      "query": "What is the notice requirement window for migrating a policy under current IRDAI portability or migration rules?",
+      "positive_documents": [
+        "bb31517562c7a364:21"
+      ]
+    },
+    {
+      "query": "What long term discounts apply to premium totals for two-year, three-year, and five-year health policy terms under Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:23",
+        "bb31517562c7a364:24"
+      ]
+    },
+    {
+      "query": "What premium discounts are rewarded to families depending on choices of two, three, or greater than three members under Health Alpha?",
+      "positive_documents": [
+        "bb31517562c7a364:24"
+      ]
+    },
+    {
+      "query": "Which regions are explicitly mapped out to form Zone A under the geographic pricing guidelines of health policies?",
+      "positive_documents": [
+        "bb31517562c7a364:24",
+        "bb31517562c7a364:25"
+      ]
+    },
+    {
+      "query": "What total number of primary core base covers and dynamic optional covers are available under the Super Health Insurance plan?",
+      "positive_documents": [
+        "6138ff953d8c452e:1"
+      ]
+    },
+    {
+      "query": "What is the maximum sum insured amount threshold achievable under the Super Health Insurance product?",
+      "positive_documents": [
+        "6138ff953d8c452e:1"
+      ]
+    },
+    {
+      "query": "How does the ReInsure Benefit feature operate with respect to standard paid claims and recurring triggers within a single policy year?",
+      "positive_documents": [
+        "6138ff953d8c452e:1",
+        "6138ff953d8c452e:2"
+      ]
+    },
+    {
+      "query": "What is the maximum target percentage milestone for Enhanced Cumulative Bonus accumulator accounts in Super Health Insurance?",
+      "positive_documents": [
+        "6138ff953d8c452e:2"
+      ]
+    },
+    {
+      "query": "What is the entry age limit range for dependent children under the Super Health Insurance guideline rules?",
+      "positive_documents": [
+        "6138ff953d8c452e:4"
+      ]
+    },
+    {
+      "query": "What are the names of the five product plan variants available to purchasers of the Super Health Insurance plan?",
+      "positive_documents": [
+        "6138ff953d8c452e:7"
+      ]
+    },
+    {
+      "query": "What specific daily cash package conditions apply under the Shared Accommodation Cash Benefit option of Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:11",
+        "6138ff953d8c452e:12"
+      ]
+    },
+    {
+      "query": "List five medical conditions from the 37 listed options protected under the Health Multiplier serious illness program of Super Health.",
+      "positive_documents": [
+        "6138ff953d8c452e:14",
+        "6138ff953d8c452e:15"
+      ]
+    },
+    {
+      "query": "What are the prerequisite medical practitioner certification conditions required for a valid Domiciliary Hospitalization reimbursement claim under Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:19"
+      ]
+    },
+    {
+      "query": "Is Home Health Care treatment admissible on a standard reimbursement claim path under Super Health policy rules?",
+      "positive_documents": [
+        "6138ff953d8c452e:20",
+        "6138ff953d8c452e:21"
+      ]
+    },
+    {
+      "query": "What are the baseline criteria governing domestic air ambulance coverage eligibility in the Super Health prospectus?",
+      "positive_documents": [
+        "6138ff953d8c452e:21",
+        "6138ff953d8c452e:22",
+        "6138ff953d8c452e:23"
+      ]
+    },
+    {
+      "query": "Are any organs obtained outside the scope of specific historical tissue amendment bills or rules acceptable for harvesting under the Organ Donor Expenses feature of Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:23",
+        "6138ff953d8c452e:24",
+        "6138ff953d8c452e:25"
+      ]
+    },
+    {
+      "query": "What specific components or operational conditions outline the step-by-step sequence of claim deduction values under the Super Health program?",
+      "positive_documents": [
+        "6138ff953d8c452e:14",
+        "6138ff953d8c452e:27",
+        "6138ff953d8c452e:76"
+      ]
+    },
+    {
+      "query": "List five of the highly specialized operational treatments explicitly permitted for settlement under the Modern Treatments clause of Super Health.",
+      "positive_documents": [
+        "6138ff953d8c452e:31"
+      ]
+    },
+    {
+      "query": "What core milestone requirements determine individual female maternity claims validity under a single adult health policy versus multi-year family combinations in Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:41",
+        "6138ff953d8c452e:42"
+      ]
+    },
+    {
+      "query": "What specific gestational milestone excludes arbitrary voluntary medical pregnancy terminations under the Maternity section of Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:43",
+        "6138ff953d8c452e:44"
+      ]
+    },
+    {
+      "query": "What are the rules regarding newborn child entry options for infants between 90 days and 1 year of age under Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:45"
+      ]
+    },
+    {
+      "query": "What criteria protect an insurance accumulator from resetting via the Enhanced Cumulative Bonus Safeguard optional cover?",
+      "positive_documents": [
+        "6138ff953d8c452e:68"
+      ]
+    },
+    {
+      "query": "What co-payment limits are forced onto consumers if they select the standard dynamic elective Co-payment option under section D.3 of Super Health?",
+      "positive_documents": [
+        "6138ff953d8c452e:68",
+        "6138ff953d8c452e:69"
+      ]
+    },
+    {
+      "query": "What is the regulatory role and legal baseline definition applied to Domestic Help/Staff personnel as listed in policy glossary attachments?",
+      "positive_documents": [
+        "6138ff953d8c452e:73"
+      ]
+    },
+    {
+      "query": "What additional coverage multiple is provided under the Accident related hospitalization optional cover D.6?",
+      "positive_documents": [
+        "6138ff953d8c452e:75",
+        "6138ff953d8c452e:76"
+      ]
+    },
+    {
+      "query": "What operational utilization parameter regulates the custody of the Unlimited Gym Membership wellness benefit?",
+      "positive_documents": [
+        "6138ff953d8c452e:79"
+      ]
+    },
+    {
+      "query": "What maximum renewal premium discount threshold can be achieved via step targets in the Walk Healthy Benefit program?",
+      "positive_documents": [
+        "6138ff953d8c452e:80"
+      ]
+    },
+    {
+      "query": "Within how many days of policy commencement must the dedicated mobile registration application be downloaded to enable step counting points systems?",
+      "positive_documents": [
+        "6138ff953d8c452e:83",
+        "6138ff953d8c452e:84"
+      ]
+    },
+    {
+      "query": "What initial step volume target triggers a 15% discount for a 1-adult floter structural combination policy after 9 months?",
+      "positive_documents": [
+        "6138ff953d8c452e:86"
+      ]
+    },
+    {
+      "query": "What waiting period parameter limits international emergency clinical treatments under the Medical Treatment Abroad framework rules?",
+      "positive_documents": [
+        "6138ff953d8c452e:98"
+      ]
+    },
+    {
+      "query": "What standard penalty fine limits apply to generic individual defaults under Section 41 Prohibition of Rebates codes within the Insurance Act of 1938?",
+      "positive_documents": [
+        "6138ff953d8c452e:151",
+        "6138ff953d8c452e:152"
+      ]
+    },
+    {
+      "query": "What specific premium values, floater parameters, and target baseline metrics are detailed within the Elite Plan 5 Lac example attachments?",
+      "positive_documents": [
+        "6138ff953d8c452e:155",
+        "6138ff953d8c452e:156",
+        "6138ff953d8c452e:157"
+      ]
+    },
+    {
+      "query": "What is the total premium when the Premier Plan with a 10 Lac sum insured is opted on a floater basis for a family of six?",
+      "positive_documents": [
+        "6138ff953d8c452e:159",
+        "6138ff953d8c452e:160",
+        "6138ff953d8c452e:161"
+      ]
+    },
+    {
+      "query": "What standard direct business channels discount is available under the premium reduction guidelines of health plans?",
+      "positive_documents": [
+        "6138ff953d8c452e:145"
+      ]
+    }
+  ]
+}

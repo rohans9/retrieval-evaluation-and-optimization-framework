@@ -88,6 +88,12 @@ class PreprocessingConfig(BaseModel):
     cleanup_whitespace: bool = True
     remove_headers: bool = True
     remove_footers: bool = True
+    # Fraction of pages that must share the same header/footer to trigger removal
+    header_footer_removal_threshold: float = 0.7
+    # Number of top lines to consider for header detection (per page)
+    header_detection_lines: int = 2
+    # Number of bottom lines to consider for footer detection (per page)
+    footer_detection_lines: int = 2
     remove_page_numbers: bool = True
     remove_empty_lines: bool = True
 

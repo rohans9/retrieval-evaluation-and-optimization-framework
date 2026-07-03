@@ -1,0 +1,14 @@
+retrieval.retriever:
+  - bm25
+  - dense
+  - hybrid
+
+retrieval.top_k:
+  - 5
+  - 10
+
+chunking.chunk_size:
+  - 128
+  - 256
+  - 512
+  - 1024
