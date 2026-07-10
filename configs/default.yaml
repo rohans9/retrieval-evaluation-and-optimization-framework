@@ -2,7 +2,7 @@ device: auto
 logging:
   level: INFO
 ingestion:
-  input_directory: data/policies
+  input_directory: data/raw
   recursive: true
   supported_extensions:
     - .pdf

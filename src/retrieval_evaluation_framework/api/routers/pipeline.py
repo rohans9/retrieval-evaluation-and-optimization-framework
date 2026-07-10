@@ -30,16 +30,25 @@ def ingest(request: IngestRequest) -> PipelineStageResponse:
     """Ingest supported documents and persist raw document artifacts."""
     ensure_exists(request.source_path, "Source path")
     pipeline = _load_pipeline(request.config_path)
-    documents = pipeline.ingest_path(request.source_path)
-    output_path = pipeline.save_documents(
-        documents,
-        pipeline.config.output.output_directory / "ingested_documents.json",
+
+    document_count = 0
+    source_count = 0
+    for _, current_source in pipeline.iter_sources(request.source_path):
+        source_count += 1
+        documents = pipeline.ingest_path(current_source)
+        document_count += len(documents)
+        pipeline.save_documents_for_source(documents, current_source, "ingested_documents.json")
+
+    output_path = (
+        pipeline.config.output.output_directory
+        if source_count > 1
+        else pipeline.output_path_for(request.source_path, "ingested_documents.json")
     )
     return PipelineStageResponse(
         stage="ingest",
         source_path=str(request.source_path),
         output_path=str(output_path),
-        document_count=len(documents),
+        document_count=document_count,
     )
 
 
@@ -48,17 +57,30 @@ def preprocess(request: PreprocessRequest) -> PipelineStageResponse:
     """Ingest and preprocess supported documents."""
     ensure_exists(request.source_path, "Source path")
     pipeline = _load_pipeline(request.config_path)
-    documents = pipeline.ingest_path(request.source_path)
-    processed = pipeline.preprocess_documents(documents)
-    output_path = pipeline.save_documents(
-        processed,
-        pipeline.config.output.output_directory / "preprocessed_documents.json",
+
+    document_count = 0
+    source_count = 0
+    for _, current_source in pipeline.iter_sources(request.source_path):
+        source_count += 1
+        documents = pipeline.ingest_path(current_source)
+        processed = pipeline.preprocess_documents(documents)
+        document_count += len(processed)
+        pipeline.save_documents_for_source(
+            processed,
+            current_source,
+            "preprocessed_documents.json",
+        )
+
+    output_path = (
+        pipeline.config.output.output_directory
+        if source_count > 1
+        else pipeline.output_path_for(request.source_path, "preprocessed_documents.json")
     )
     return PipelineStageResponse(
         stage="preprocess",
         source_path=str(request.source_path),
         output_path=str(output_path),
-        document_count=len(processed),
+        document_count=document_count,
     )
 
 
@@ -68,22 +90,31 @@ def chunk(request: ChunkRequest) -> PipelineStageResponse:
     ensure_exists(request.source_path, "Source path")
     pipeline = _load_pipeline(request.config_path)
     try:
-        corpus = (
-            pipeline.process_file(request.source_path)
-            if request.source_path.is_file()
-            else pipeline.process_directory(request.source_path)
-        )
+        document_count = 0
+        chunk_count = 0
+        source_count = 0
+        for _, current_source in pipeline.iter_sources(request.source_path):
+            source_count += 1
+            corpus = (
+                pipeline.process_file(current_source)
+                if current_source.is_file()
+                else pipeline.process_directory(current_source)
+            )
+            document_count += int(corpus.statistics["document_count"])
+            chunk_count += int(corpus.statistics["chunk_count"])
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
-    output_path = (
-        pipeline.config.output.output_directory
-        / pipeline.config.output.processed_corpus_filename
+    output_path = pipeline.config.output.output_directory if source_count > 1 else (
+        pipeline.output_path_for(
+            request.source_path,
+            pipeline.config.output.processed_corpus_filename,
+        )
     )
     return PipelineStageResponse(
         stage="chunk",
         source_path=str(request.source_path),
         output_path=str(output_path),
-        document_count=int(corpus.statistics["document_count"]),
-        chunk_count=int(corpus.statistics["chunk_count"]),
+        document_count=document_count,
+        chunk_count=chunk_count,
     )

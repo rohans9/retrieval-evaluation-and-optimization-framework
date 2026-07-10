@@ -9,7 +9,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 ExperimentStatus = Literal["running", "completed", "failed"]
-BenchmarkMode = Literal["single", "sweep", "grid_search", "ablation"]
+BenchmarkMode = Literal["single", "sweep", "grid_search", "ablation", "optuna"]
 
 
 class QueryMetrics(BaseModel):

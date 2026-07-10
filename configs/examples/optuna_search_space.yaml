@@ -1,0 +1,16 @@
+retrieval.top_k:
+  type: int
+  low: 1
+  high: 10
+  step: 1
+retrieval.retriever:
+  type: categorical
+  choices:
+    - bm25
+    - hybrid
+chunking.chunk_size:
+  type: categorical
+  choices:
+    - 120
+    - 180
+    - 240

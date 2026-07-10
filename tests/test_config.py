@@ -35,6 +35,8 @@ def test_example_app_configs_are_loadable() -> None:
         "dense_retrieval.yaml",
         "hybrid_retrieval.yaml",
         "hyde_enabled.yaml",
+        "query_rewrite.yaml",
+        "rewrite_hyde_chain.yaml",
         "reranker_enabled.yaml",
         "benchmark_experiment.yaml",
     ]
@@ -44,7 +46,29 @@ def test_example_app_configs_are_loadable() -> None:
 
 
 def test_example_parameter_templates_are_loadable() -> None:
-    for name in ["parameter_sweep.yaml", "grid_search.yaml"]:
+    for name in ["parameter_sweep.yaml", "grid_search.yaml", "optuna_search_space.yaml"]:
         payload = yaml.safe_load((Path("configs/examples") / name).read_text(encoding="utf-8"))
         assert isinstance(payload, dict)
         assert payload
+
+
+def test_query_enhancement_methods_backward_compatibility() -> None:
+    payload = {
+        "query_enhancement": {
+            "enabled": True,
+            "method": "hyde",
+        }
+    }
+    config = AppConfig.model_validate(payload)
+    assert config.query_enhancement.resolved_methods() == ["hyde"]
+
+
+def test_query_enhancement_methods_order_is_preserved() -> None:
+    payload = {
+        "query_enhancement": {
+            "enabled": True,
+            "methods": ["rewrite", "expansion", "hyde"],
+        }
+    }
+    config = AppConfig.model_validate(payload)
+    assert config.query_enhancement.resolved_methods() == ["rewrite", "expansion", "hyde"]

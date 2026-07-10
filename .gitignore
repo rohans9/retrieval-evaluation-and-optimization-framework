@@ -3,6 +3,13 @@ venv/
 env/
 ENV/
 
+*.DS_Store
+**/.DS_Store
+
+__pycache__/
+**/__pycache__/
+*.pyc
+
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -10,6 +17,7 @@ dist/
 build/
 *.egg-info/
 data/processed/
+data/cache/
 reports/
 
 prompts/

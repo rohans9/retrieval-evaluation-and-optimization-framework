@@ -41,6 +41,10 @@ QUERY_OPTION = typer.Option("--query", "-q")
 TOP_K_OPTION = typer.Option("--top-k")
 EMBEDDINGS_PATH_OPTION = typer.Option("--output-path")
 PARAMETERS_PATH_OPTION = typer.Option("--parameters-path", exists=True, readable=True)
+SEARCH_SPACE_PATH_OPTION = typer.Option("--search-space-path", exists=True, readable=True)
+TRIALS_OPTION = typer.Option("--trials", min=1)
+OBJECTIVE_OPTION = typer.Option("--objective")
+SEED_OPTION = typer.Option("--seed")
 EXPERIMENT_DIRECTORY_OPTION = typer.Option("--experiment-directory")
 NOTES_OPTION = typer.Option("--notes")
 EXPERIMENT_IDS_OPTION = typer.Option("--experiment-ids")
@@ -145,6 +149,24 @@ def _load_parameter_mapping(path: Path) -> dict[str, list[Any]]:
     return mapping
 
 
+def _load_optuna_search_space(path: Path) -> dict[str, Any]:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        msg = "Search space file must contain a mapping of dotted paths to specs"
+        raise typer.BadParameter(msg)
+
+    search_space: dict[str, Any] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            msg = "Each search-space key must be a dotted string path"
+            raise typer.BadParameter(msg)
+        if not isinstance(value, (list, dict)):
+            msg = "Each search-space value must be a list or mapping spec"
+            raise typer.BadParameter(msg)
+        search_space[key] = value
+    return search_space
+
+
 def _render_benchmark_result(title: str, result: Any) -> None:
     _render_summary(
         title,
@@ -200,6 +222,43 @@ def _run_evaluation_command(
     _render_benchmark_result("Evaluation Summary", result)
 
 
+def _infer_corpus_domain(config: AppConfig, corpus_path: Path) -> str | None:
+    if corpus_path.name != config.output.processed_corpus_filename:
+        return None
+    try:
+        relative_parent = corpus_path.parent.resolve().relative_to(
+            config.output.output_directory.resolve()
+        )
+    except ValueError:
+        return None
+
+    if len(relative_parent.parts) != 1:
+        return None
+    return relative_parent.parts[0]
+
+
+def _resolve_default_embedding_path(
+    config: AppConfig,
+    corpus_path: Path,
+    output_path: Path,
+) -> Path:
+    if output_path != DEFAULT_EMBEDDINGS_PATH:
+        return output_path
+    domain = _infer_corpus_domain(config, corpus_path)
+    return output_path / domain if domain else output_path
+
+
+def _resolve_default_index_path(
+    config: AppConfig,
+    corpus_path: Path,
+    index_path: Path,
+) -> Path:
+    if index_path != DEFAULT_INDEX_PATH:
+        return index_path
+    domain = _infer_corpus_domain(config, corpus_path)
+    return index_path / domain if domain else index_path
+
+
 @app.command()
 def ingest(
     source_path: SourcePath,
@@ -208,24 +267,42 @@ def ingest(
     """Ingest supported documents and persist the raw corpus.
 
     Example:
-        retrieval ingest ./data/input --config ./configs/default.yaml
+        retrieval ingest ./data/raw --config ./configs/default.yaml
     """
     with _command_span("ingest"):
         pipeline = _load_pipeline(config_path)
 
-        def action() -> tuple[list[Any], Path]:
-            documents = pipeline.ingest_path(source_path)
-            output_path = pipeline.save_documents(
-                documents,
-                pipeline.config.output.output_directory / "ingested_documents.json",
+        def action() -> tuple[int, Path, int]:
+            total_documents = 0
+            source_count = 0
+            output_root = pipeline.config.output.output_directory
+            for _, current_source in pipeline.iter_sources(source_path):
+                source_count += 1
+                documents = pipeline.ingest_path(current_source)
+                total_documents += len(documents)
+                pipeline.save_documents_for_source(
+                    documents,
+                    current_source,
+                    "ingested_documents.json",
+                )
+            output_path = output_root if source_count > 1 else pipeline.output_path_for(
+                source_path,
+                "ingested_documents.json",
             )
-            return documents, output_path
+            return total_documents, output_path, source_count
 
-        documents, output_path = _run_with_progress("Ingesting documents", action)
+        document_count, output_path, source_count = _run_with_progress(
+            "Ingesting documents",
+            action,
+        )
 
         _render_summary(
             "Ingestion Summary",
-            [("Documents", str(len(documents))), ("Output", str(output_path))],
+            [
+                ("Documents", str(document_count)),
+                ("Groups", str(source_count)),
+                ("Output", str(output_path)),
+            ],
         )
 
 
@@ -237,24 +314,42 @@ def preprocess(
     """Ingest and preprocess documents.
 
     Example:
-        retrieval preprocess ./data/input --config ./configs/default.yaml
+        retrieval preprocess ./data/raw --config ./configs/default.yaml
     """
     with _command_span("preprocess"):
         pipeline = _load_pipeline(config_path)
 
-        def action() -> tuple[list[Any], Path]:
-            documents = pipeline.preprocess_documents(pipeline.ingest_path(source_path))
-            output_path = pipeline.save_documents(
-                documents,
-                pipeline.config.output.output_directory / "preprocessed_documents.json",
+        def action() -> tuple[int, Path, int]:
+            total_documents = 0
+            source_count = 0
+            output_root = pipeline.config.output.output_directory
+            for _, current_source in pipeline.iter_sources(source_path):
+                source_count += 1
+                documents = pipeline.preprocess_documents(pipeline.ingest_path(current_source))
+                total_documents += len(documents)
+                pipeline.save_documents_for_source(
+                    documents,
+                    current_source,
+                    "preprocessed_documents.json",
+                )
+            output_path = output_root if source_count > 1 else pipeline.output_path_for(
+                source_path,
+                "preprocessed_documents.json",
             )
-            return documents, output_path
+            return total_documents, output_path, source_count
 
-        documents, output_path = _run_with_progress("Preprocessing documents", action)
+        document_count, output_path, source_count = _run_with_progress(
+            "Preprocessing documents",
+            action,
+        )
 
         _render_summary(
             "Preprocessing Summary",
-            [("Documents", str(len(documents))), ("Output", str(output_path))],
+            [
+                ("Documents", str(document_count)),
+                ("Groups", str(source_count)),
+                ("Output", str(output_path)),
+            ],
         )
 
 
@@ -266,29 +361,42 @@ def chunk(
     """Run phase-1 processing and persist a processed corpus.
 
     Example:
-        retrieval chunk ./data/input --config ./configs/default.yaml
+        retrieval chunk ./data/raw --config ./configs/default.yaml
     """
     with _command_span("chunk"):
         pipeline = _load_pipeline(config_path)
 
-        def action() -> Any:
-            if source_path.is_file():
-                corpus = pipeline.process_file(source_path)
-            else:
-                corpus = pipeline.process_directory(source_path)
-            output_path = (
-                pipeline.config.output.output_directory
-                / pipeline.config.output.processed_corpus_filename
-            )
-            return corpus, output_path
+        def action() -> tuple[int, int, Path, int]:
+            total_documents = 0
+            total_chunks = 0
+            source_count = 0
+            output_root = pipeline.config.output.output_directory
+            for _, current_source in pipeline.iter_sources(source_path):
+                source_count += 1
+                if current_source.is_file():
+                    corpus = pipeline.process_file(current_source)
+                else:
+                    corpus = pipeline.process_directory(current_source)
+                total_documents += int(corpus.statistics["document_count"])
+                total_chunks += int(corpus.statistics["chunk_count"])
 
-        corpus, output_path = _run_with_progress("Generating chunks", action)
+            output_path = output_root if source_count > 1 else pipeline.output_path_for(
+                source_path,
+                pipeline.config.output.processed_corpus_filename,
+            )
+            return total_documents, total_chunks, output_path, source_count
+
+        document_count, chunk_count, output_path, source_count = _run_with_progress(
+            "Generating chunks",
+            action,
+        )
 
         _render_summary(
             "Chunking Summary",
             [
-                ("Documents", str(corpus.statistics["document_count"])),
-                ("Chunks", str(corpus.statistics["chunk_count"])),
+                ("Documents", str(document_count)),
+                ("Chunks", str(chunk_count)),
+                ("Groups", str(source_count)),
                 ("Output", str(output_path)),
             ],
         )
@@ -308,6 +416,7 @@ def retrieval_embed(
     with _command_span("retrieval.embed"):
         config = AppConfig.load_yaml(config_path)
         configure_logging(config.logging.level)
+        resolved_output_path = _resolve_default_embedding_path(config, corpus_path, output_path)
 
         from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
         from retrieval_evaluation_framework.models import ProcessedCorpus
@@ -317,7 +426,7 @@ def retrieval_embed(
 
         def action() -> Any:
             embedding_store = embedding_engine.embed_chunks(corpus.chunks)
-            embedding_store.save(output_path)
+            embedding_store.save(resolved_output_path)
             return embedding_store
 
         embedding_store = _run_with_progress("Embedding chunks", action)
@@ -328,7 +437,7 @@ def retrieval_embed(
                 ("Chunks", str(len(embedding_store.chunk_ids))),
                 ("Model", embedding_store.model_name),
                 ("Dimension", str(embedding_store.dimension)),
-                ("Output", str(output_path)),
+                ("Output", str(resolved_output_path)),
             ],
         )
 
@@ -345,11 +454,13 @@ def retrieval_index(
         retrieval retrieval index --corpus-path ./data/processed/processed_corpus.json
     """
     with _command_span("retrieval.index"):
+        config = AppConfig.load_yaml(config_path)
+        resolved_index_path = _resolve_default_index_path(config, corpus_path, index_path)
         pipeline = _load_retrieval_pipeline(config_path)
 
         def action() -> Any:
             corpus = pipeline.index_processed_corpus(corpus_path)
-            pipeline.save_index(index_path)
+            pipeline.save_index(resolved_index_path)
             return corpus
 
         corpus = _run_with_progress("Building index", action)
@@ -359,7 +470,7 @@ def retrieval_index(
             [
                 ("Retriever", pipeline.retriever.name),
                 ("Chunks", str(len(corpus.chunks))),
-                ("Index Path", str(index_path)),
+                ("Index Path", str(resolved_index_path)),
             ],
         )
 
@@ -568,6 +679,47 @@ def retrieval_grid_search(
         _render_summary(
             "Grid Search Summary",
             [("Experiments", str(len(results))), ("Best NDCG@K", f"{best_ndcg:.4f}")],
+        )
+
+
+@retrieval_app.command("optuna-search")
+def retrieval_optuna_search(
+    corpus_path: CorpusPath,
+    dataset_path: DatasetPath,
+    search_space_path: Annotated[Path, SEARCH_SPACE_PATH_OPTION],
+    config_path: ConfigPath = DEFAULT_CONFIG_PATH,
+    trials: Annotated[int, TRIALS_OPTION] = 20,
+    objective: Annotated[str, OBJECTIVE_OPTION] = "mrr",
+    seed: Annotated[int | None, SEED_OPTION] = None,
+    experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
+    notes: Annotated[str | None, NOTES_OPTION] = None,
+) -> None:
+    """Run Optuna hyperparameter optimization over retrieval configurations."""
+    with _command_span("retrieval.optuna_search"):
+        config, runner, _ = _load_benchmark_runner(config_path, experiment_directory)
+        search_space = _load_optuna_search_space(search_space_path)
+        results, best_result, best_value = _run_with_progress(
+            "Running Optuna search",
+            lambda: runner.optuna_search(
+                config=config,
+                corpus_path=corpus_path,
+                dataset_path=dataset_path,
+                search_space=search_space,
+                n_trials=trials,
+                objective_metric=objective,
+                notes=notes or config.benchmark.notes,
+                seed=seed,
+            ),
+        )
+
+        _render_summary(
+            "Optuna Search Summary",
+            [
+                ("Trials", str(len(results))),
+                ("Objective", objective),
+                ("Best Value", f"{best_value:.4f}"),
+                ("Best Experiment", best_result.experiment.experiment_id),
+            ],
         )
 
 

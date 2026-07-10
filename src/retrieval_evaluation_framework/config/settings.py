@@ -74,7 +74,7 @@ class LoggingConfig(BaseModel):
 class IngestionConfig(BaseModel):
     """Document ingestion configuration."""
 
-    input_directory: Path = Path("data/input")
+    input_directory: Path = Path("data/raw")
     recursive: bool = True
     supported_extensions: list[str] = Field(
         default_factory=lambda: [".pdf", ".docx", ".txt", ".md"]
@@ -213,8 +213,9 @@ class RetrievalConfig(BaseModel):
         return self
 
 
-QueryEnhancementMethod = Literal["none", "expansion", "hyde"]
+QueryEnhancementMethod = Literal["none", "rewrite", "expansion", "hyde"]
 HydeBackendName = Literal["auto", "transformers", "template"]
+RewriteBackendName = Literal["auto", "transformers", "template"]
 
 
 class QueryExpansionConfig(BaseModel):
@@ -233,13 +234,51 @@ class HydeConfig(BaseModel):
     max_new_tokens: int = 48
 
 
+class QueryRewriteConfig(BaseModel):
+    """Query rewriting configuration."""
+
+    backend: RewriteBackendName = "auto"
+    generator_model: str = "gpt2"
+    max_new_tokens: int = 32
+
+
 class QueryEnhancementConfig(BaseModel):
     """Optional query enhancement configuration."""
 
     enabled: bool = False
     method: QueryEnhancementMethod = "none"
+    methods: list[QueryEnhancementMethod] = Field(default_factory=list)
+    rewrite: QueryRewriteConfig = Field(default_factory=QueryRewriteConfig)
     expansion: QueryExpansionConfig = Field(default_factory=QueryExpansionConfig)
     hyde: HydeConfig = Field(default_factory=HydeConfig)
+
+    @model_validator(mode="after")
+    def normalize_methods(self) -> QueryEnhancementConfig:
+        """Normalize legacy single-method config into ordered methods."""
+        if self.methods:
+            normalized_methods: list[QueryEnhancementMethod] = []
+            for method in self.methods:
+                if method == "none":
+                    continue
+                if method not in normalized_methods:
+                    normalized_methods.append(method)
+            self.methods = normalized_methods
+            return self
+
+        if not self.enabled or self.method == "none":
+            self.methods = []
+            return self
+
+        self.methods = [self.method]
+        return self
+
+    def resolved_methods(self) -> list[QueryEnhancementMethod]:
+        """Return effective enhancement methods in execution order."""
+        if not self.enabled:
+            return []
+        if self.methods:
+            return [method for method in self.methods if method != "none"]
+        return [self.method] if self.method != "none" else []
 
 
 RerankerBackendName = Literal["auto", "cross_encoder", "lexical"]

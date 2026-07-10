@@ -245,3 +245,31 @@ def test_parameter_sweep_applies_reranking_enabled_override(
     )
 
     assert observed_enabled_flags == [False, True]
+
+
+def test_optuna_search_runs_trials_and_returns_best_result(tmp_path: Path) -> None:
+    pytest.importorskip("optuna")
+
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    results, best_result, best_value = runner.optuna_search(
+        config=config,
+        corpus_path=corpus_path,
+        dataset_path=dataset_path,
+        search_space={
+            "retrieval.top_k": [1, 2],
+            "retrieval.retriever": ["bm25", "hybrid"],
+        },
+        n_trials=2,
+        objective_metric="mrr",
+        seed=42,
+    )
+
+    assert len(results) == 2
+    assert best_result in results
+    assert best_value >= 0.0

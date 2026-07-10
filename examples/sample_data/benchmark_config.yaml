@@ -1,5 +1,0 @@
-config_path: configs/examples/benchmark_experiment.yaml
-corpus_source: examples/sample_data/documents
-dataset_path: examples/sample_data/evaluation_dataset.yaml
-sweep_parameters_path: configs/examples/parameter_sweep.yaml
-grid_parameters_path: configs/examples/grid_search.yaml

@@ -7,6 +7,8 @@ from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
 from retrieval_evaluation_framework.query_enhancement.base import QueryEnhancer
 from retrieval_evaluation_framework.query_enhancement.expansion import QueryExpander
 from retrieval_evaluation_framework.query_enhancement.hyde import HydeQueryEnhancer
+from retrieval_evaluation_framework.query_enhancement.pipeline import SequentialQueryEnhancer
+from retrieval_evaluation_framework.query_enhancement.rewrite import RewriteQueryEnhancer
 
 
 class QueryEnhancerFactory:
@@ -30,17 +32,30 @@ class QueryEnhancerFactory:
         Raises:
             ValueError: If query expansion is requested without an embedding engine.
         """
-        if not config.enabled or config.method == "none":
+        methods = config.resolved_methods()
+        if not methods:
             return None
 
-        if config.method == "expansion":
-            if embedding_engine is None:
-                msg = "Query expansion requires an embedding engine"
-                raise ValueError(msg)
-            return QueryExpander(config.expansion, embedding_engine)
+        enhancers: list[QueryEnhancer] = []
+        for method in methods:
+            if method == "rewrite":
+                enhancers.append(RewriteQueryEnhancer(config.rewrite))
+                continue
 
-        if config.method == "hyde":
-            return HydeQueryEnhancer(config.hyde)
+            if method == "expansion":
+                if embedding_engine is None:
+                    msg = "Query expansion requires an embedding engine"
+                    raise ValueError(msg)
+                enhancers.append(QueryExpander(config.expansion, embedding_engine))
+                continue
 
-        msg = f"Unsupported query enhancement method: {config.method}"
-        raise ValueError(msg)
+            if method == "hyde":
+                enhancers.append(HydeQueryEnhancer(config.hyde))
+                continue
+
+            msg = f"Unsupported query enhancement method: {method}"
+            raise ValueError(msg)
+
+        if len(enhancers) == 1:
+            return enhancers[0]
+        return SequentialQueryEnhancer(enhancers)

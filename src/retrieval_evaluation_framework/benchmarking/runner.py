@@ -5,6 +5,7 @@ from __future__ import annotations
 import itertools
 import time
 import json
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +113,84 @@ class BenchmarkRunner:
                 )
             )
         return results
+
+    def optuna_search(
+        self,
+        config: AppConfig,
+        corpus_path: Path,
+        dataset_path: Path,
+        search_space: dict[str, Any],
+        n_trials: int,
+        objective_metric: str = "mrr",
+        notes: str | None = None,
+        seed: int | None = None,
+    ) -> tuple[list[BenchmarkResult], BenchmarkResult, float]:
+        """Run Optuna hyperparameter optimization over retrieval configurations."""
+        if n_trials <= 0:
+            msg = "n_trials must be greater than zero"
+            raise ValueError(msg)
+        if objective_metric not in {"mrr", "ndcg"}:
+            msg = "objective_metric must be one of: mrr, ndcg"
+            raise ValueError(msg)
+        if not search_space:
+            msg = "search_space cannot be empty"
+            raise ValueError(msg)
+
+        try:
+            optuna = importlib.import_module("optuna")
+        except Exception as error:
+            msg = "Optuna is required for optuna_search. Install with `pip install optuna`."
+            raise RuntimeError(msg) from error
+
+        results: list[BenchmarkResult] = []
+        best_result: BenchmarkResult | None = None
+        best_value = float("-inf")
+
+        sampler = optuna.samplers.TPESampler(seed=seed)
+        study = optuna.create_study(direction="maximize", sampler=sampler)
+
+        def objective(trial: Any) -> float:
+            nonlocal best_result, best_value
+
+            overrides = {
+                path: self._suggest_optuna_value(trial, path, spec)
+                for path, spec in search_space.items()
+            }
+            derived_config = self._with_overrides(config, overrides)
+            trial_notes = self._merge_notes(
+                notes,
+                f"optuna:trial={trial.number},overrides={overrides}",
+            )
+            result = self._run(
+                derived_config,
+                corpus_path,
+                dataset_path,
+                mode="optuna",
+                notes=trial_notes,
+                override_paths=set(overrides),
+            )
+            results.append(result)
+
+            quality = result.experiment.retrieval_quality_metrics
+            if quality is None:
+                return float("-inf")
+            score = (
+                quality.mean_reciprocal_rank
+                if objective_metric == "mrr"
+                else quality.ndcg_at_k
+            )
+            if score >= best_value:
+                best_value = score
+                best_result = result
+            return score
+
+        study.optimize(objective, n_trials=n_trials)
+
+        if best_result is None:
+            msg = "Optuna search completed without any successful trial"
+            raise RuntimeError(msg)
+
+        return results, best_result, best_value
 
     def ablation_study(
         self,
@@ -296,7 +375,7 @@ class BenchmarkRunner:
 
     @staticmethod
     def _should_regenerate_chunks(mode: BenchmarkMode, override_paths: set[str]) -> bool:
-        if mode not in {"sweep", "grid_search"}:
+        if mode not in {"sweep", "grid_search", "optuna"}:
             return False
         return any(path in _CHUNKING_OVERRIDE_PATHS for path in override_paths)
 
@@ -348,9 +427,8 @@ class BenchmarkRunner:
         mode: BenchmarkMode,
         notes: str | None,
     ) -> ExperimentRecord:
-        enhancement_method = (
-            config.query_enhancement.method if config.query_enhancement.enabled else "none"
-        )
+        methods = config.query_enhancement.resolved_methods()
+        enhancement_method = ",".join(methods) if methods else "none"
         reranker_name = config.reranking.model_name if config.reranking.enabled else "none"
         return ExperimentRecord(
             experiment_id=self.tracker.next_experiment_id(),
@@ -465,3 +543,48 @@ class BenchmarkRunner:
                 cursor[key] = next_value
             cursor = next_value
         cursor[keys[-1]] = value
+
+    @staticmethod
+    def _suggest_optuna_value(trial: Any, path: str, spec: Any) -> Any:
+        if isinstance(spec, list):
+            if not spec:
+                msg = f"Search space list for {path} cannot be empty"
+                raise ValueError(msg)
+            return trial.suggest_categorical(path, spec)
+
+        if not isinstance(spec, dict):
+            msg = f"Search space for {path} must be a list or dict"
+            raise ValueError(msg)
+
+        spec_type = spec.get("type", "categorical")
+
+        if spec_type == "categorical":
+            choices = spec.get("choices")
+            if not isinstance(choices, list) or not choices:
+                msg = f"categorical search space for {path} requires non-empty choices"
+                raise ValueError(msg)
+            return trial.suggest_categorical(path, choices)
+
+        if spec_type == "int":
+            low = spec.get("low")
+            high = spec.get("high")
+            if not isinstance(low, int) or not isinstance(high, int):
+                msg = f"int search space for {path} requires integer low/high"
+                raise ValueError(msg)
+            step = spec.get("step", 1)
+            if not isinstance(step, int) or step <= 0:
+                msg = f"int search space for {path} requires positive integer step"
+                raise ValueError(msg)
+            return trial.suggest_int(path, low, high, step=step)
+
+        if spec_type == "float":
+            low = spec.get("low")
+            high = spec.get("high")
+            if not isinstance(low, (int, float)) or not isinstance(high, (int, float)):
+                msg = f"float search space for {path} requires numeric low/high"
+                raise ValueError(msg)
+            log = bool(spec.get("log", False))
+            return trial.suggest_float(path, float(low), float(high), log=log)
+
+        msg = f"Unsupported search space type for {path}: {spec_type}"
+        raise ValueError(msg)

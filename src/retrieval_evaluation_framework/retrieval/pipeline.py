@@ -14,7 +14,6 @@ from retrieval_evaluation_framework.config.settings import AppConfig
 from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
 from retrieval_evaluation_framework.logging import get_logger
 from retrieval_evaluation_framework.models import Chunk, ProcessedCorpus, RetrievalResponse
-from retrieval_evaluation_framework.query_enhancement.expansion import QueryExpander
 from retrieval_evaluation_framework.query_enhancement.factory import QueryEnhancerFactory
 from retrieval_evaluation_framework.reranking.factory import RerankerFactory
 from retrieval_evaluation_framework.retrieval.factory import RetrieverFactory
@@ -50,7 +49,7 @@ class RetrievalPipeline:
             "retrieval_pipeline_initialized",
             retriever=self.retriever.name,
             query_enhancement=(
-                self.config.query_enhancement.method
+                ",".join(self.config.query_enhancement.resolved_methods())
                 if self.query_enhancer
                 else None
             ),
@@ -79,7 +78,7 @@ class RetrievalPipeline:
             chunks: Chunks to index.
         """
         self.retriever.build_index(chunks)
-        if isinstance(self.query_enhancer, QueryExpander):
+        if self.query_enhancer is not None:
             self.query_enhancer.fit(chunks)
         self._is_built = True
         LOGGER.info("retrieval_index_built", chunk_count=len(chunks))
