@@ -1,18 +1,22 @@
 retrieval.retriever:
+  - bm25
+  - dense
   - hybrid
 
 retrieval.top_k:
   - 5
+  - 10
 
 chunking.strategy:
+  - fixed
   - recursive
 
 chunking.chunk_size:
+  - 128
   - 256
 
 chunking.overlap:
-  - 20
+  - 50
 
 reranking.enabled:
-  - false
   - true

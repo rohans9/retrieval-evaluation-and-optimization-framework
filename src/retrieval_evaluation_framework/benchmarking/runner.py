@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import time
+import json
 from pathlib import Path
 from typing import Any
 
@@ -21,10 +22,17 @@ from retrieval_evaluation_framework.config.settings import AppConfig
 from retrieval_evaluation_framework.evaluation.datasets import JsonEvaluationDatasetLoader
 from retrieval_evaluation_framework.evaluation.metrics import MetricEvaluator
 from retrieval_evaluation_framework.logging import get_logger
-from retrieval_evaluation_framework.models import Chunk, RetrievalResult
+from retrieval_evaluation_framework.models import Chunk, Document, ProcessedCorpus, RetrievalResult
+from retrieval_evaluation_framework.pipeline import DocumentProcessingPipeline
 from retrieval_evaluation_framework.retrieval.pipeline import RetrievalPipeline
 
 LOGGER = get_logger(component="benchmark_runner")
+
+_CHUNKING_OVERRIDE_PATHS = {
+    "chunking.strategy",
+    "chunking.chunk_size",
+    "chunking.overlap",
+}
 
 
 class BenchmarkRunner:
@@ -70,6 +78,7 @@ class BenchmarkRunner:
                         dataset_path,
                         mode="sweep",
                         notes=run_notes,
+                        override_paths={parameter_name},
                     )
                 )
         return results
@@ -99,6 +108,7 @@ class BenchmarkRunner:
                     dataset_path,
                     mode="grid_search",
                     notes=run_notes,
+                    override_paths=set(overrides),
                 )
             )
         return results
@@ -141,6 +151,7 @@ class BenchmarkRunner:
         dataset_path: Path,
         mode: BenchmarkMode,
         notes: str | None,
+        override_paths: set[str] | None = None,
     ) -> BenchmarkResult:
         dataset = self.dataset_loader.load(dataset_path)
         experiment = self._create_experiment_record(config, corpus_path, dataset_path, mode, notes)
@@ -149,7 +160,12 @@ class BenchmarkRunner:
 
         try:
             pipeline = RetrievalPipeline(config)
-            corpus = pipeline.load_processed_corpus(corpus_path)
+            corpus = self._load_or_generate_corpus(
+                config=config,
+                corpus_path=corpus_path,
+                mode=mode,
+                override_paths=override_paths or set(),
+            )
             self._validate_dataset_alignment(dataset.examples, corpus.chunks)
             experiment.selected_device = (
                 pipeline.embedding_engine.device
@@ -267,6 +283,63 @@ class BenchmarkRunner:
             index_build_time_ms=index_build_time_ms,
         )
 
+    @staticmethod
+    def _load_or_generate_corpus(
+        config: AppConfig,
+        corpus_path: Path,
+        mode: BenchmarkMode,
+        override_paths: set[str],
+    ) -> ProcessedCorpus:
+        if BenchmarkRunner._should_regenerate_chunks(mode, override_paths):
+            return BenchmarkRunner._regenerate_corpus_from_preprocessed(config, corpus_path)
+        return ProcessedCorpus.model_validate_json(corpus_path.read_text(encoding="utf-8"))
+
+    @staticmethod
+    def _should_regenerate_chunks(mode: BenchmarkMode, override_paths: set[str]) -> bool:
+        if mode not in {"sweep", "grid_search"}:
+            return False
+        return any(path in _CHUNKING_OVERRIDE_PATHS for path in override_paths)
+
+    @staticmethod
+    def _regenerate_corpus_from_preprocessed(
+        config: AppConfig,
+        corpus_path: Path,
+    ) -> ProcessedCorpus:
+        documents = BenchmarkRunner._load_preprocessed_documents(config, corpus_path)
+        processing_pipeline = DocumentProcessingPipeline(config)
+        chunks = processing_pipeline.chunk_documents(documents)
+
+        average_chunk_tokens = (
+            sum(chunk.token_count for chunk in chunks) / len(chunks) if chunks else 0.0
+        )
+        return ProcessedCorpus(
+            device=config.resolved_device,
+            documents=documents,
+            chunks=chunks,
+            statistics={
+                "document_count": len(documents),
+                "chunk_count": len(chunks),
+                "average_chunk_tokens": round(average_chunk_tokens, 2),
+            },
+            config_snapshot=config.to_metadata(),
+        )
+
+    @staticmethod
+    def _load_preprocessed_documents(config: AppConfig, corpus_path: Path) -> list[Document]:
+        del config
+        candidate_paths = [corpus_path.parent / "preprocessed_documents.json"]
+
+        for candidate_path in candidate_paths:
+            if candidate_path.exists():
+                payload = json.loads(candidate_path.read_text(encoding="utf-8"))
+                if not isinstance(payload, list):
+                    msg = f"Expected a list of documents in {candidate_path}"
+                    raise ValueError(msg)
+                return [Document.model_validate(item) for item in payload]
+
+        base_corpus = ProcessedCorpus.model_validate_json(corpus_path.read_text(encoding="utf-8"))
+        return base_corpus.documents
+
     def _create_experiment_record(
         self,
         config: AppConfig,
@@ -375,8 +448,10 @@ class BenchmarkRunner:
     @staticmethod
     def _with_overrides(config: AppConfig, overrides: dict[str, Any]) -> AppConfig:
         payload = config.to_metadata()
+
         for path, value in overrides.items():
             BenchmarkRunner._apply_override(payload, path, value)
+
         return AppConfig.model_validate(payload)
 
     @staticmethod

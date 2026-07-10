@@ -16,6 +16,8 @@ from retrieval_evaluation_framework.benchmarking.models import (
 from retrieval_evaluation_framework.benchmarking.runner import BenchmarkRunner
 from retrieval_evaluation_framework.benchmarking.tracking import ExperimentTracker
 from retrieval_evaluation_framework.config.settings import AppConfig
+from retrieval_evaluation_framework.pipeline import DocumentProcessingPipeline
+from retrieval_evaluation_framework.reranking.factory import RerankerFactory
 from tests.benchmark_helpers import (
     write_benchmark_config,
     write_corpus,
@@ -181,3 +183,65 @@ examples:
 
     with pytest.raises(ValueError, match="Dataset labels do not match corpus identifiers"):
         runner.run_single_experiment(config, corpus_path, dataset_path)
+
+
+def test_grid_search_rechunks_when_chunking_parameters_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = write_benchmark_config(tmp_path, retriever="bm25")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    observed_chunk_sizes: list[int] = []
+    original_chunk_documents = DocumentProcessingPipeline.chunk_documents
+
+    def spying_chunk_documents(self: DocumentProcessingPipeline, documents: list) -> list:
+        observed_chunk_sizes.append(self.config.chunking.chunk_size)
+        return original_chunk_documents(self, documents)
+
+    monkeypatch.setattr(DocumentProcessingPipeline, "chunk_documents", spying_chunk_documents)
+
+    runner.grid_search(
+        config,
+        corpus_path,
+        dataset_path,
+        parameter_grid={
+            "chunking.chunk_size": [80, 120],
+            "retrieval.top_k": [2],
+        },
+    )
+
+    assert observed_chunk_sizes == [80, 120]
+
+
+def test_parameter_sweep_applies_reranking_enabled_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = write_benchmark_config(tmp_path, retriever="bm25")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    observed_enabled_flags: list[bool] = []
+
+    def spying_create(config):
+        observed_enabled_flags.append(config.enabled)
+        return None
+
+    monkeypatch.setattr(RerankerFactory, "create", staticmethod(spying_create))
+
+    runner.parameter_sweep(
+        config,
+        corpus_path,
+        dataset_path,
+        sweep_parameters={"reranking.enabled": [False, True]},
+    )
+
+    assert observed_enabled_flags == [False, True]

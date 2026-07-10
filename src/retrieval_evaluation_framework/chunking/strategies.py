@@ -30,6 +30,8 @@ def _token_chunks(tokens: list[str], chunk_size: int, overlap: int) -> list[str]
     step = max(1, chunk_size - overlap)
     chunks: list[str] = []
 
+    should_merge_tiny_trailing = chunk_size >= 30
+
     for index in range(0, len(tokens), step):
         window = tokens[index : index + chunk_size]
 
@@ -38,6 +40,8 @@ def _token_chunks(tokens: list[str], chunk_size: int, overlap: int) -> list[str]
 
         # Merge very small trailing chunk into previous
         if (
+            should_merge_tiny_trailing
+            and
             chunks
             and len(window) < max(15, chunk_size // 3)
         ):
@@ -93,6 +97,9 @@ def _apply_overlap(
     overlap: int,
 ) -> list[str]:
     """Apply token overlap to already merged chunks."""
+
+    if not chunks:
+        return []
 
     if overlap <= 0:
         return chunks
@@ -162,13 +169,14 @@ class RecursiveChunker(BaseChunker):
             self.config.overlap,
         )
 
+        minimum_tokens = max(1, min(15, self.config.chunk_size // 2))
         clean_chunks = []
 
         for chunk in chunk_texts:
             chunk = re.sub(r"\n{3,}", "\n\n", chunk)
             chunk = chunk.strip()
 
-            if count_tokens(chunk) < 15:
+            if count_tokens(chunk) < minimum_tokens:
                 continue
 
             clean_chunks.append(chunk)
@@ -256,13 +264,14 @@ class SemanticChunker(BaseChunker):
                 )
             )
 
+        minimum_tokens = max(1, min(15, self.config.chunk_size // 2))
         clean_chunks = []
 
-        for chunk in chunk_texts:
+        for chunk in normalized_chunks:
             chunk = re.sub(r"\n{3,}", "\n\n", chunk)
             chunk = chunk.strip()
 
-            if count_tokens(chunk) < 15:
+            if count_tokens(chunk) < minimum_tokens:
                 continue
 
             clean_chunks.append(chunk)
