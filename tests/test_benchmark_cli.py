@@ -340,11 +340,6 @@ retrieval.top_k:
     type: int
     low: 1
     high: 2
-retrieval.retriever:
-    type: categorical
-    choices:
-        - bm25
-        - hybrid
 """.strip(),
                 encoding="utf-8",
         )
@@ -363,7 +358,7 @@ retrieval.retriever:
                         "--trials",
                         "2",
                         "--objective",
-                        "mrr",
+                        "ndcg",
                         "--config",
                         str(config_path),
                         "--experiment-directory",
@@ -372,3 +367,45 @@ retrieval.retriever:
         )
 
         assert result.exit_code == 0
+
+
+def test_cli_optuna_search_rejects_retriever_hyperparameter(tmp_path: Path) -> None:
+    pytest.importorskip("optuna")
+
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    search_space_path = tmp_path / "optuna_invalid_space.yaml"
+    search_space_path.write_text(
+        """
+retrieval.retriever:
+  type: categorical
+  choices:
+    - bm25
+    - hybrid
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = RUNNER.invoke(
+        app,
+        [
+            "retrieval",
+            "optuna-search",
+            "--corpus-path",
+            str(corpus_path),
+            "--dataset-path",
+            str(dataset_path),
+            "--search-space-path",
+            str(search_space_path),
+            "--trials",
+            "1",
+            "--config",
+            str(config_path),
+            "--experiment-directory",
+            str(tmp_path / "experiments"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Separate Optuna studies by retriever family" in result.stdout

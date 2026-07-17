@@ -6,9 +6,7 @@ from retrieval_evaluation_framework.config.settings import QueryEnhancementConfi
 from retrieval_evaluation_framework.embeddings.engine import EmbeddingEngine
 from retrieval_evaluation_framework.query_enhancement.base import QueryEnhancer
 from retrieval_evaluation_framework.query_enhancement.expansion import QueryExpander
-from retrieval_evaluation_framework.query_enhancement.hyde import HydeQueryEnhancer
 from retrieval_evaluation_framework.query_enhancement.pipeline import SequentialQueryEnhancer
-from retrieval_evaluation_framework.query_enhancement.rewrite import RewriteQueryEnhancer
 
 
 class QueryEnhancerFactory:
@@ -38,19 +36,11 @@ class QueryEnhancerFactory:
 
         enhancers: list[QueryEnhancer] = []
         for method in methods:
-            if method == "rewrite":
-                enhancers.append(RewriteQueryEnhancer(config.rewrite))
-                continue
-
             if method == "expansion":
                 if embedding_engine is None:
                     msg = "Query expansion requires an embedding engine"
                     raise ValueError(msg)
                 enhancers.append(QueryExpander(config.expansion, embedding_engine))
-                continue
-
-            if method == "hyde":
-                enhancers.append(HydeQueryEnhancer(config.hyde))
                 continue
 
             msg = f"Unsupported query enhancement method: {method}"

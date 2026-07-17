@@ -12,13 +12,10 @@ embedding:
 retrieval:
   retriever: hybrid
   top_k: 5
-query_enhancement:
-  enabled: false
-  method: none
 reranking:
   enabled: false
 benchmark:
-  dataset_path: examples/sample_data/evaluation_dataset.yaml
+  dataset_path: data/evaluation/insurance_eval_dataset.json
   experiment_directory: reports/experiments
   results_directory: reports/benchmarks
   test_split_ratio: 0.2

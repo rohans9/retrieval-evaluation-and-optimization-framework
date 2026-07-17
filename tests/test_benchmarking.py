@@ -218,6 +218,49 @@ def test_grid_search_rechunks_when_chunking_parameters_change(
     assert observed_chunk_sizes == [80, 120]
 
 
+def test_optuna_regenerates_chunks_for_semantic_chunking_parameters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("optuna")
+
+    config_path = write_benchmark_config(tmp_path, retriever="bm25")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    observed_configs: list[tuple[float, int]] = []
+    original_chunk_documents = DocumentProcessingPipeline.chunk_documents
+
+    def spying_chunk_documents(self: DocumentProcessingPipeline, documents: list) -> list:
+        observed_configs.append(
+            (
+                self.config.chunking.semantic_similarity_threshold,
+                self.config.chunking.semantic_min_sentences,
+            )
+        )
+        return original_chunk_documents(self, documents)
+
+    monkeypatch.setattr(DocumentProcessingPipeline, "chunk_documents", spying_chunk_documents)
+
+    runner.optuna_search(
+        config=config,
+        corpus_path=corpus_path,
+        dataset_path=dataset_path,
+        search_space={
+            "chunking.semantic_similarity_threshold": [0.51, 0.63],
+            "chunking.semantic_min_sentences": [1],
+        },
+        n_trials=2,
+        objective_metric="ndcg",
+        seed=42,
+    )
+
+    assert sorted(observed_configs) == [(0.51, 1), (0.63, 1)]
+
+
 def test_parameter_sweep_applies_reranking_enabled_override(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -263,13 +306,47 @@ def test_optuna_search_runs_trials_and_returns_best_result(tmp_path: Path) -> No
         dataset_path=dataset_path,
         search_space={
             "retrieval.top_k": [1, 2],
-            "retrieval.retriever": ["bm25", "hybrid"],
         },
         n_trials=2,
-        objective_metric="mrr",
+        objective_metric="ndcg",
         seed=42,
     )
 
     assert len(results) == 2
     assert best_result in results
     assert best_value >= 0.0
+
+
+def test_optuna_search_rejects_retriever_and_query_enhancement_hyperparameters(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("optuna")
+
+    config_path = write_benchmark_config(tmp_path, retriever="hybrid")
+    corpus_path = write_corpus(tmp_path)
+    dataset_path = write_dataset(tmp_path)
+    config = AppConfig.load_yaml(config_path)
+    tracker = ExperimentTracker(config.benchmark.experiment_directory)
+    runner = BenchmarkRunner(tracker)
+
+    with pytest.raises(ValueError, match="Separate Optuna studies by retriever family"):
+        runner.optuna_search(
+            config=config,
+            corpus_path=corpus_path,
+            dataset_path=dataset_path,
+            search_space={"retrieval.retriever": ["bm25", "hybrid"]},
+            n_trials=1,
+            objective_metric="ndcg",
+            seed=42,
+        )
+
+    with pytest.raises(ValueError, match="Query enhancement settings are benchmark variants"):
+        runner.optuna_search(
+            config=config,
+            corpus_path=corpus_path,
+            dataset_path=dataset_path,
+            search_space={"query_enhancement.enabled": [False, True]},
+            n_trials=1,
+            objective_metric="ndcg",
+            seed=42,
+        )

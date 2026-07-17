@@ -33,6 +33,23 @@ _CHUNKING_OVERRIDE_PATHS = {
     "chunking.strategy",
     "chunking.chunk_size",
     "chunking.overlap",
+    "chunking.semantic_similarity_threshold",
+    "chunking.semantic_min_sentences",
+    "chunking.semantic_encoder_model",
+}
+
+_OPTUNA_FORBIDDEN_OVERRIDE_PATHS = {
+    "retrieval.retriever": (
+        "Separate Optuna studies by retriever family; fix retrieval.retriever in the config "
+        "instead of tuning it in the search space."
+    ),
+}
+
+_OPTUNA_FORBIDDEN_OVERRIDE_PREFIXES = {
+    "query_enhancement.": (
+        "Query enhancement settings are benchmark variants, not Optuna hyperparameters. "
+        "Run them outside the search space."
+    ),
 }
 
 
@@ -121,7 +138,7 @@ class BenchmarkRunner:
         dataset_path: Path,
         search_space: dict[str, Any],
         n_trials: int,
-        objective_metric: str = "mrr",
+        objective_metric: str = "ndcg",
         notes: str | None = None,
         seed: int | None = None,
     ) -> tuple[list[BenchmarkResult], BenchmarkResult, float]:
@@ -129,12 +146,14 @@ class BenchmarkRunner:
         if n_trials <= 0:
             msg = "n_trials must be greater than zero"
             raise ValueError(msg)
-        if objective_metric not in {"mrr", "ndcg"}:
-            msg = "objective_metric must be one of: mrr, ndcg"
+        if objective_metric != "ndcg":
+            msg = "objective_metric must be ndcg"
             raise ValueError(msg)
         if not search_space:
             msg = "search_space cannot be empty"
             raise ValueError(msg)
+
+        self._validate_optuna_search_space(search_space)
 
         try:
             optuna = importlib.import_module("optuna")
@@ -174,11 +193,7 @@ class BenchmarkRunner:
             quality = result.experiment.retrieval_quality_metrics
             if quality is None:
                 return float("-inf")
-            score = (
-                quality.mean_reciprocal_rank
-                if objective_metric == "mrr"
-                else quality.ndcg_at_k
-            )
+            score = quality.ndcg_at_k
             if score >= best_value:
                 best_value = score
                 best_result = result
@@ -588,3 +603,12 @@ class BenchmarkRunner:
 
         msg = f"Unsupported search space type for {path}: {spec_type}"
         raise ValueError(msg)
+
+    @staticmethod
+    def _validate_optuna_search_space(search_space: dict[str, Any]) -> None:
+        for path in search_space:
+            if path in _OPTUNA_FORBIDDEN_OVERRIDE_PATHS:
+                raise ValueError(_OPTUNA_FORBIDDEN_OVERRIDE_PATHS[path])
+            for prefix, message in _OPTUNA_FORBIDDEN_OVERRIDE_PREFIXES.items():
+                if path.startswith(prefix):
+                    raise ValueError(message)

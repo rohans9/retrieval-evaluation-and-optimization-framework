@@ -689,7 +689,7 @@ def retrieval_optuna_search(
     search_space_path: Annotated[Path, SEARCH_SPACE_PATH_OPTION],
     config_path: ConfigPath = DEFAULT_CONFIG_PATH,
     trials: Annotated[int, TRIALS_OPTION] = 20,
-    objective: Annotated[str, OBJECTIVE_OPTION] = "mrr",
+    objective: Annotated[str, OBJECTIVE_OPTION] = "ndcg",
     seed: Annotated[int | None, SEED_OPTION] = None,
     experiment_directory: Annotated[Path | None, EXPERIMENT_DIRECTORY_OPTION] = None,
     notes: Annotated[str | None, NOTES_OPTION] = None,

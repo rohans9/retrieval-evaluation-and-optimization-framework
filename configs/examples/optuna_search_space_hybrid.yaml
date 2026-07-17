@@ -1,0 +1,18 @@
+retrieval.top_k:
+  type: int
+  low: 5
+  high: 15
+  step: 1
+retrieval.fusion.rrf_k:
+  type: int
+  low: 20
+  high: 120
+  step: 10
+index.bm25.k1:
+  type: float
+  low: 0.8
+  high: 2.2
+index.bm25.b:
+  type: float
+  low: 0.2
+  high: 0.95

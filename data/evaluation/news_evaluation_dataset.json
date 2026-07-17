@@ -1,0 +1,121 @@
+{
+  "examples": [
+    {
+      "query": "What partnership did J&K Bank ink regarding the Census 2027?",
+      "positive_documents": [
+        "de2035b4542462c6:63",
+        "de2035b4542462c6:64",
+        "de2035b4542462c6:65"
+      ]
+    },
+    {
+      "query": "What did Amit Shah identify as the primary cause of border demographic changes?",
+      "positive_documents": [
+        "de2035b4542462c6:1",
+        "de2035b4542462c6:8"
+      ]
+    },
+    {
+      "query": "What paradigm shift did CM Omar Abdullah call for in Jammu and Kashmir's tourism strategy?",
+      "positive_documents": [
+        "de2035b4542462c6:1",
+        "de2035b4542462c6:2",
+        "de2035b4542462c6:181"
+      ]
+    },
+    {
+      "query": "Against whom did the ACB register a corruption case in the Bijbehara land mutation scam?",
+      "positive_documents": [
+        "de2035b4542462c6:9",
+        "de2035b4542462c6:10",
+        "de2035b4542462c6:11"
+      ]
+    },
+    {
+      "query": "How did Prime Minister Modi illustrate the strength of India-Australia ties in Melbourne?",
+      "positive_documents": [
+        "de2035b4542462c6:9",
+        "de2035b4542462c6:10",
+        "de2035b4542462c6:13"
+      ]
+    },
+    {
+      "query": "Why did the Jammu Fast Track Court acquit three accused in the 2022 rape case at Ustad Mohalla?",
+      "positive_documents": [
+        "de2035b4542462c6:10",
+        "de2035b4542462c6:14",
+        "de2035b4542462c6:170",
+        "de2035b4542462c6:171"
+      ]
+    },
+    {
+      "query": "Which banned books were allegedly cleared for supply to government schools in J&K?",
+      "positive_documents": [
+        "de2035b4542462c6:21",
+        "de2035b4542462c6:23",
+        "de2035b4542462c6:26",
+        "de2035b4542462c6:27"
+      ]
+    },
+    {
+      "query": "What are the dedicated routes for the Raahi Hop Jammu bus service?",
+      "positive_documents": [
+        "de2035b4542462c6:73",
+        "de2035b4542462c6:74",
+        "de2035b4542462c6:76"
+      ]
+    },
+    {
+      "query": "Why did youths protest during Deputy Chief Minister Surinder Choudhary's public event in Kathua?",
+      "positive_documents": [
+        "de2035b4542462c6:82",
+        "de2035b4542462c6:83",
+        "de2035b4542462c6:88"
+      ]
+    },
+    {
+      "query": "What is the starting price of the newly unveiled Nissan TEKTON SUV in India?",
+      "positive_documents": [
+        "de2035b4542462c6:233",
+        "de2035b4542462c6:234",
+        "de2035b4542462c6:235"
+      ]
+    },
+    {
+      "query": "Which J&K sabre fencers qualified for the 2026 World Fencing Championships in Hong Kong?",
+      "positive_documents": [
+        "de2035b4542462c6:213",
+        "de2035b4542462c6:214"
+      ]
+    },
+    {
+      "query": "Where did Army officials defuse an old unexploded mortar shell in Poonch?",
+      "positive_documents": [
+        "de2035b4542462c6:148",
+        "de2035b4542462c6:149",
+        "de2035b4542462c6:150"
+      ]
+    },
+    {
+      "query": "Which IAS officer was transferred from Jammu and Kashmir to Arunachal Pradesh in the recent AGMUT reshuffle?",
+      "positive_documents": [
+        "de2035b4542462c6:16",
+        "de2035b4542462c6:18"
+      ]
+    },
+    {
+      "query": "In connection to which act did the police carry out raids at multiple locations in Baramulla district?",
+      "positive_documents": [
+        "de2035b4542462c6:246",
+        "de2035b4542462c6:247"
+      ]
+    },
+    {
+      "query": "What was the estimated value of the narcotics destroyed by J&K Police in Kathua district?",
+      "positive_documents": [
+        "de2035b4542462c6:239",
+        "de2035b4542462c6:241"
+      ]
+    }
+  ]
+}

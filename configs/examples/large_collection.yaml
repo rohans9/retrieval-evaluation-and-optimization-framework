@@ -19,9 +19,6 @@ embedding:
 retrieval:
   retriever: hybrid
   top_k: 10
-query_enhancement:
-  enabled: false
-  method: none
 reranking:
   enabled: false
 benchmark:

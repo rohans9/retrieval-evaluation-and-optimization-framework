@@ -213,9 +213,7 @@ class RetrievalConfig(BaseModel):
         return self
 
 
-QueryEnhancementMethod = Literal["none", "rewrite", "expansion", "hyde"]
-HydeBackendName = Literal["auto", "transformers", "template"]
-RewriteBackendName = Literal["auto", "transformers", "template"]
+QueryEnhancementMethod = Literal["none", "expansion"]
 
 
 class QueryExpansionConfig(BaseModel):
@@ -226,31 +224,13 @@ class QueryExpansionConfig(BaseModel):
     vocabulary_size: int = 512
 
 
-class HydeConfig(BaseModel):
-    """HyDE (Hypothetical Document Embeddings) configuration."""
-
-    backend: HydeBackendName = "auto"
-    generator_model: str = "gpt2"
-    max_new_tokens: int = 48
-
-
-class QueryRewriteConfig(BaseModel):
-    """Query rewriting configuration."""
-
-    backend: RewriteBackendName = "auto"
-    generator_model: str = "gpt2"
-    max_new_tokens: int = 32
-
-
 class QueryEnhancementConfig(BaseModel):
     """Optional query enhancement configuration."""
 
     enabled: bool = False
     method: QueryEnhancementMethod = "none"
     methods: list[QueryEnhancementMethod] = Field(default_factory=list)
-    rewrite: QueryRewriteConfig = Field(default_factory=QueryRewriteConfig)
     expansion: QueryExpansionConfig = Field(default_factory=QueryExpansionConfig)
-    hyde: HydeConfig = Field(default_factory=HydeConfig)
 
     @model_validator(mode="after")
     def normalize_methods(self) -> QueryEnhancementConfig:

@@ -6,8 +6,5 @@ embedding:
 retrieval:
   retriever: dense
   top_k: 8
-query_enhancement:
-  enabled: false
-  method: none
 reranking:
   enabled: false

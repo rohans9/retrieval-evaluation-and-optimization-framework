@@ -12,6 +12,13 @@ license = { text = "MIT" }
 authors = [
   { name = "Rohan Sahu" }
 ]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Developers",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
   "fastapi>=0.115.0,<1.0.0",
   "faiss-cpu>=1.8.0.post1,<2.0.0",

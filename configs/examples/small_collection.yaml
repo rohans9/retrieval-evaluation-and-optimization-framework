@@ -18,9 +18,6 @@ embedding:
 retrieval:
   retriever: bm25
   top_k: 5
-query_enhancement:
-  enabled: false
-  method: none
 reranking:
   enabled: false
 benchmark:
